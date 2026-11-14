@@ -17,6 +17,7 @@
 - **多段階の深掘り検索**: 1回の検索で終わらせず、`search_web` で以下のように追加掘削し、確認に使った検索クエリを参照ソース一覧に記録してください：
   - ボトルネック・評価の穴: `NAVSIM OR Bench2Drive OR HUGSIM failure mode limitation ablation navhard`、`Wayve OR Momenta OR Horizon OR Xpeng OR comma.ai OR Waymo OR Zoox OR "Tier IV" VLA "World Model" latency bottleneck`
   - 異分野転用・車載最適化: `"Jetson AGX Thor" OR Orin VLA "FP8" "KV cache" OR "Flash Primitive Decoding" OR "Paged Experts" latency`、`autonomous driving RLVR OR GRPO OR PRM OR "Oracle Selector" trajectory`
+  - **コミュニティ議論（補助・任意）**: ランナー注入の AD/Loop-Graph 補助シグナル（該当時のみ最大各3件）や Reddit（`r/selfdrivingcars`, `r/robotics` 等）/ HN / X の実運用失敗報告があれば URL 付きで参照可（検索して該当なし時は「検索結果では未確認」とし `## コミュニティ探索メモ` へ記録）。**バズ不在をボトルネックや仮説の不採択理由にせず、検証指標の根拠にもバズを使わないこと**。
 
 【出力フォーマット（必須構造）】
 1行目は必ず `# 自動運転 未解決ボトルネック台帳 & 異分野転用ブレイクスルー実験設計` とし、以下の構成で出力してください。
@@ -60,8 +61,11 @@
 ### 実験2（仮説2に対応）: <実験タイトル>
 - （実験1と同構造で記載）
 
+## コミュニティ探索メモ（Reddit / X 検索ログ・該当時のみ）
+- 実行した Reddit / X 検索クエリと結果（「該当あり（URL）」または「検索結果では未確認」）を簡潔に記録。
+
 ## 参照ソース一覧
-| # | 論文・技術資料・ベンチマーク名 | URL | 公開/更新日 | 確認に使った検索クエリ | 一次/二次区分・確認レベル（L1/L2） |
+| # | 論文・技術資料・ベンチマーク名 | URL | 公開/更新日 | 確認に使った検索クエリ | 一次/二次区分・確認レベル（L1/L2/C） |
 | --- | --- | --- | --- | --- | --- |
 ```
 

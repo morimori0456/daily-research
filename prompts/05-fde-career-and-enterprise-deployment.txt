@@ -15,6 +15,8 @@ Google / OpenAI / Anthropic の Forward Deployed Engineer（FDE）/ Applied AI E
   - 求人・選考: `Google OR OpenAI OR Anthropic "Forward Deployed" OR "Applied AI Engineer" Tokyo OR APAC OR Singapore jobs`
   - プラットフォーム: `"Vertex AI" ADK OR "Agents SDK" OR "Anthropic" MCP OR AAIF enterprise release changelog`
   - 本番導入事例: `Anthropic OR OpenAI OR "Google Cloud" customer story manufacturing OR automotive OR robotics OR enterprise architecture eval latency RBAC`
+  - **コミュニティ議論（HN / Reddit / X・上限: 上位3トピック × 各1〜2クエリ）**: ランナー注入の HN スコア（障害報告・プラットフォーム賛否等）に加え、Reddit（`r/ExperiencedDevs`, `r/ClaudeAI`, `r/MachineLearning` 等）および X（`"x.com" OR "twitter.com" OR "on X"` + 製品/プラットフォーム名）で、実務エンジニアによる移行痛・料金/レート制限批判・信頼性評価を URL 付きで検索してください（URL なき「X で話題」は禁止。検索で該当なし時は「検索結果では未確認」とし `## コミュニティ探索メモ` へ記録）。
+  - **重要ガードレール**: コミュニティ議論は `[C: コミュニティ議論]` として公式求人・公式仕様（`[L2]`）と厳格に分離し、求人募集状態や年収・採用ハードルの推測根拠に絶対に使わないでください。また、バズ不在を理由に一次求人・公式導入事例を不採択にしないでください。
 
 【出力フォーマット（必須構造）】
 1行目は必ず `# FDE キャリア・エンタープライズ AI 本番導入インテリジェンス` とし、以下の構成で出力してください。
@@ -36,6 +38,7 @@ Google / OpenAI / Anthropic の Forward Deployed Engineer（FDE）/ Applied AI E
 - **Google（Vertex AI / ADK / Agent Engine / A2A / Eval）**: ...（確認レベル: `[L2: ...]` or `[L1: ...]`）
 - **OpenAI（OpenAI Enterprise / Agents SDK / Responses API / AAIF / Eval）**: ...
 - **Anthropic（Anthropic Enterprise / Claude Code / MCP / AAIF / Bedrock・Vertex連携）**: ...
+- **コミュニティ反響（HN / Reddit / X・実務評価/障害・賛否）**:（注入 HN スコアや Reddit/X 検索で確認された実務上の評価・批判・障害報告と URL。該当なし時は「検索結果では未確認（探索メモ参照）」）
 
 ## 2. エンタープライズ本番導入ケーススタディ解剖（製造・自動車・物理AI・基幹業務優先）
 （※ 直近の一次事例を2件程度厳選。該当が少ない日は1件のみ、または「新規一次事例なし（0件）」も許容）
@@ -58,10 +61,14 @@ Google / OpenAI / Anthropic の Forward Deployed Engineer（FDE）/ Applied AI E
 - **要件 × 現在地ギャップ診断**:（3社 FDE 要件のうち自分の強み［AV/ML・マルチエージェントハーネス・Jetson AGX Thor］で即戦力を示せる領域と、エンタープライズ証明が不足しているギャップ領域）
 - **強みを証拠化する次の一手（1件）**:（受入条件、Eval 指標、認可/監査境界、顧客引継ぎドキュメントまで含めた具体的検証成果物）
 
+## コミュニティ探索メモ（Reddit / X 検索ログ）
+- 対象トピックごとに実行した Reddit / X 検索クエリと結果（「該当あり（URL）」または「検索結果では未確認」）を簡潔に記録。
+
 ## 参照ソース一覧
-| # | ソース・媒体名 | URL | 公開/更新日 | 確認に使った検索クエリ | 一次/二次区分・確認レベル（L1/L2） |
+| # | ソース・媒体名 | URL | 公開/更新日 | 確認に使った検索クエリ | 一次/二次区分・確認レベル（L1/L2/C） |
 | --- | --- | --- | --- | --- | --- |
 ```
+（※ コミュニティ議論の URL は `[C: コミュニティ議論（発見・賛否シグナル）]` とし、`[L2]`/`[L1]` と区別してください）
 
 【制約・品質基準】
 - `[L2: 公式リリース・アブストラクト・仕様確認済]` と `[L1: 検索断片のみ・詳細未確認]` を厳格に区別し、`L1` に留まる情報のみを根拠にした強い推奨（応募戦略の断定や本番移行推奨等）や未確認コマンド・URL の創作を厳禁とします。

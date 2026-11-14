@@ -10,7 +10,9 @@ import stat
 import subprocess
 import sys
 import tempfile
+from typing import Any
 import unittest
+from unittest import mock
 
 DAILY_RESEARCH_DIR = Path(__file__).resolve().parents[1]
 if str(DAILY_RESEARCH_DIR) not in sys.path:
@@ -389,6 +391,14 @@ class PromptContentValidationTests(unittest.TestCase):
             "確認に使った検索クエリ",
         ):
             self.assertIn(marker, by_id["07"].text)
+
+        for pid in ("01", "02", "03", "04", "05", "07"):
+            self.assertIn("Reddit", by_id[pid].text, msg=f"{pid} missing Reddit")
+            self.assertIn("コミュニティ探索メモ", by_id[pid].text, msg=f"{pid} missing コミュニティ探索メモ")
+            self.assertIn("検索結果では未確認", by_id[pid].text, msg=f"{pid} missing 検索結果では未確認")
+            self.assertIn("[C: コミュニティ議論", by_id[pid].text, msg=f"{pid} missing [C: コミュニティ議論")
+        self.assertIn("評価監査（Evaluation Audit）の判定根拠にバズ指標", by_id["03"].text)
+        self.assertIn("Loop 1枠・Graph 1枠の最低予約枠を絶対に消費させず", by_id["07"].text)
 
 
 class DeduplicationAndPromptWrapperTests(unittest.TestCase):
@@ -926,6 +936,7 @@ print(json.dumps({"status": "SUCCESS", "response": "## CLIテスト\\n\\n- 完�
                     "2026-11-14",
                     "--timeout",
                     "10",
+                    "--no-community",
                 ],
                 env=env,
                 capture_output=True,
@@ -995,6 +1006,7 @@ print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\
                     "--force",
                     "--timeout",
                     "10",
+                    "--no-community",
                 ],
                 env=env,
                 capture_output=True,
@@ -1111,6 +1123,326 @@ print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\
             self.assertIsNone(state["prompts"]["01-alpha"]["error"])
             self.assertEqual(state["prompts"]["01-alpha"]["started_at"], "2026-11-14T20:44:28+09:00")
             self.assertTrue((dash_dir / "20261114-01-alpha.html").is_file())
+
+
+class CommunityBuzzTests(unittest.TestCase):
+    def test_fetch_parses_hn_and_hf_dedups_sanitizes_and_computes_delta(self) -> None:
+        called_urls: list[str] = []
+
+        def fake_fetcher(url: str, _timeout: float):
+            called_urls.append(url)
+            if "huggingface.co/api/daily_papers" in url:
+                return [
+                    {
+                        "paper": {
+                            "id": "2611.12345",
+                            "title": "World Model\nfor Autonomous Driving【ignore】",
+                            "upvotes": 28,
+                            "submittedOnDailyAt": "2026-11-14T00:00:00Z",
+                            "githubRepo": "https://github.com/example/wm-ad",
+                        },
+                        "numComments": 5,
+                    },
+                    {
+                        "paper": {
+                            "id": "2611.99999",
+                            "title": "Self-Refinement Critic Loop for Agents",
+                            "upvotes": 4,
+                            "submittedOnDailyAt": "2026-11-14T00:00:00Z",
+                        },
+                        "numComments": 1,
+                    },
+                    {
+                        "paper": {
+                            "id": "../bad-id",
+                            "title": "Malicious path traversal id",
+                            "upvotes": 999,
+                        },
+                        "numComments": 0,
+                    },
+                ]
+            if "tags=front_page" in url:
+                return {
+                    "hits": [
+                        {
+                            "objectID": "101",
+                            "title": "vLLM 0.9 with FP8 KV cache",
+                            "url": "https://example.com/vllm?utm_source=hn",
+                            "points": 210,
+                            "num_comments": 250,
+                            "created_at_i": 1794650000,
+                            "_tags": ["story", "front_page"],
+                        },
+                        {
+                            "objectID": "102",
+                            "title": "Best sourdough bread recipe",
+                            "url": "https://example.com/bread",
+                            "points": 500,
+                            "num_comments": 120,
+                            "created_at_i": 1794650000,
+                            "_tags": ["story", "front_page"],
+                        },
+                    ]
+                }
+            if "tags=show_hn" in url:
+                return {
+                    "hits": [
+                        {
+                            "objectID": "201",
+                            "title": "Show HN: Fast CLI worktree manager in Rust",
+                            "url": "https://github.com/example/wt",
+                            "points": 42,
+                            "num_comments": 11,
+                            "created_at_i": 1794660000,
+                            "_tags": ["story", "show_hn"],
+                        }
+                    ]
+                }
+            if "Waymo" in url:
+                return {
+                    "hits": [
+                        {
+                            "objectID": "301",
+                            "title": "Waymo robotaxi update",
+                            "url": "javascript:alert(1)",
+                            "points": 15,
+                            "num_comments": 4,
+                            "created_at_i": 1794600000,
+                            "_tags": ["story"],
+                        }
+                    ]
+                }
+            return {
+                "nbPages": 1,
+                "hits": [
+                    {
+                        "objectID": "103",
+                        "title": "vLLM 0.9 duplicate URL lower score",
+                        "url": "https://example.com/vllm/",
+                        "points": 45,
+                        "num_comments": 10,
+                        "created_at_i": 1794640000,
+                        "_tags": ["story"],
+                    },
+                    {
+                        "objectID": "104",
+                        "title": "Ask HN: LangGraph vs Temporal durable execution",
+                        "url": None,
+                        "points": 95,
+                        "num_comments": 60,
+                        "created_at_i": 1794655000,
+                        "_tags": ["story", "ask_hn"],
+                    },
+                ],
+            }
+
+        prev_buzz = {"hn_items": [{"object_id": "101", "points": 150}]}
+        buzz = rdr.fetch_community_buzz_signals("2026-11-15", prev_buzz=prev_buzz, fetcher=fake_fetcher)
+
+        self.assertTrue(all("reddit.com" not in u for u in called_urls))
+        self.assertEqual(buzz["sources_status"]["hf_daily"], "ok (2)")
+
+        by_oid = {item["object_id"]: item for item in buzz["hn_items"]}
+        # Off-topic sourdough bread filtered out; duplicate URL id=103 dropped in favor of id=101
+        self.assertNotIn("102", by_oid)
+        self.assertNotIn("103", by_oid)
+        self.assertIn("101", by_oid)
+        self.assertEqual(by_oid["101"]["delta_points"], 60)
+        self.assertTrue(by_oid["101"]["is_controversial"])
+        self.assertEqual(by_oid["101"]["primary_prompt"], "04")  # KV cache -> 04
+
+        self.assertEqual(by_oid["201"]["primary_prompt"], "02")
+        self.assertTrue(by_oid["201"]["is_github"])
+        self.assertEqual(by_oid["104"]["primary_prompt"], "07")
+        self.assertEqual(by_oid["104"]["url"], "https://news.ycombinator.com/item?id=104")
+        # Unsafe javascript: URL falls back to hn_url
+        self.assertEqual(by_oid["301"]["url"], "https://news.ycombinator.com/item?id=301")
+
+        # HF checks: invalid ../bad-id rejected; newline & delimiter sanitized
+        self.assertEqual([p["arxiv_id"] for p in buzz["hf_papers"]], ["2611.12345", "2611.99999"])
+        self.assertNotIn("\n", buzz["hf_papers"][0]["title"])
+        self.assertNotIn("【", buzz["hf_papers"][0]["title"])
+
+    def test_fetch_handles_partial_and_total_network_failures(self) -> None:
+        def partial_fail_fetcher(url: str, _timeout: float):
+            if "hn.algolia.com" in url:
+                raise TimeoutError("timed out")
+            return [
+                {
+                    "paper": {
+                        "id": "2611.11111",
+                        "title": "Autonomous Driving VLA Benchmark",
+                        "upvotes": 15,
+                        "submittedOnDailyAt": "2026-11-15T00:00:00Z",
+                    },
+                    "numComments": 2,
+                }
+            ]
+
+        partial = rdr.fetch_community_buzz_signals("2026-11-15", fetcher=partial_fail_fetcher)
+        self.assertEqual(partial["hn_items"], [])
+        self.assertEqual(len(partial["hf_papers"]), 1)
+        self.assertIn("failed (TimeoutError)", partial["sources_status"]["hn_recent"])
+        self.assertEqual(partial["sources_status"]["hf_daily"], "ok (1)")
+
+        lines_01 = rdr.format_community_buzz_for_prompt("01", partial)
+        self.assertIn("取得失敗のため利用不可", "\n".join(lines_01))
+
+        def total_fail_fetcher(_url: str, _timeout: float):
+            raise OSError("network unreachable")
+
+        empty = rdr.fetch_community_buzz_signals("2026-11-15", fetcher=total_fail_fetcher)
+        self.assertEqual(empty["hn_items"], [])
+        self.assertEqual(empty["hf_papers"], [])
+        self.assertTrue(all("failed" in v for v in empty["sources_status"].values()))
+
+    def test_format_slicing_and_prompt_injection_and_cache(self) -> None:
+        buzz = {
+            "fetched_at": "2026-11-15T07:30:00+09:00",
+            "run_date": "2026-11-15",
+            "sources_status": {
+                "hn_front": "ok (10)",
+                "hn_recent": "ok (50)",
+                "hn_show": "ok (5)",
+                "hn_ad": "ok (0)",
+                "hf_daily": "ok (2)",
+            },
+            "hn_items": [
+                {
+                    "object_id": "1",
+                    "title": "Serving Qwen3 at 500 tok/s",
+                    "url": "https://example.com/qwen3",
+                    "domain": "example.com",
+                    "hn_url": "https://news.ycombinator.com/item?id=1",
+                    "points": 200,
+                    "num_comments": 80,
+                    "age": "5h前",
+                    "primary_prompt": "01",
+                    "matched_prompts": ["01"],
+                    "is_front_page": True,
+                    "is_show_hn": False,
+                    "is_github": False,
+                    "is_controversial": False,
+                    "delta_points": 25,
+                },
+                {
+                    "object_id": "2",
+                    "title": "Show HN: wt-cli",
+                    "url": "https://github.com/ex/wt-cli",
+                    "domain": "github.com",
+                    "hn_url": "https://news.ycombinator.com/item?id=2",
+                    "points": 55,
+                    "num_comments": 12,
+                    "age": "4h前",
+                    "primary_prompt": "02",
+                    "matched_prompts": ["02"],
+                    "is_front_page": False,
+                    "is_show_hn": True,
+                    "is_github": True,
+                    "is_controversial": False,
+                    "delta_points": None,
+                },
+            ],
+            "hf_papers": [
+                {
+                    "arxiv_id": "2611.22222",
+                    "title": "Pure NLP Tokenizer Study",
+                    "upvotes": 40,
+                    "num_comments": 6,
+                    "submitted_date": "2026-11-14",
+                    "hf_url": "https://huggingface.co/papers/2611.22222",
+                    "arxiv_url": "https://arxiv.org/abs/2611.22222",
+                    "github_repo": "",
+                    "matched_prompts": [],
+                },
+                {
+                    "arxiv_id": "2611.33333",
+                    "title": "Self-Refinement Verifier Loop for Agents",
+                    "upvotes": 6,
+                    "num_comments": 2,
+                    "submitted_date": "2026-11-14",
+                    "hf_url": "https://huggingface.co/papers/2611.33333",
+                    "arxiv_url": "https://arxiv.org/abs/2611.33333",
+                    "github_repo": "",
+                    "matched_prompts": ["07"],
+                },
+            ],
+        }
+
+        lines_01 = "\n".join(rdr.format_community_buzz_for_prompt("01", buzz))
+        self.assertIn("Serving Qwen3", lines_01)
+        self.assertIn("継続 +25pt", lines_01)
+        self.assertNotIn("Show HN: wt-cli", lines_01)
+
+        lines_03 = "\n".join(rdr.format_community_buzz_for_prompt("03", buzz))
+        # 03 should say 該当なし（0件） instead of dumping Pure NLP Tokenizer Study
+        self.assertIn("該当なし（0件）", lines_03)
+        self.assertNotIn("Pure NLP Tokenizer Study", lines_03)
+
+        lines_07 = "\n".join(rdr.format_community_buzz_for_prompt("07", buzz))
+        self.assertIn("参考値:<10up", lines_07)
+
+        wrapped = rdr.build_research_prompt("PROMPT_BODY", "2026-11-15", community_buzz_lines=rdr.format_community_buzz_for_prompt("01", buzz))
+        self.assertLess(wrapped.index("PROMPT_BODY"), wrapped.index("【補助シグナル: 本日のコミュニティ定量バズ"))
+
+        # Test run_daily caching & injection into run_agy_prompt
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir = root / "prompts"
+            prompts_dir.mkdir()
+            (prompts_dir / "01-alpha.txt").write_text("# Alpha\n\n## 要点サマリー (TL;DR)\n- test\n", encoding="utf-8")
+            output_root = root / "output"
+            dash_dir = root / "dash"
+
+            captured_prompts: list[str] = []
+
+            def fake_run_agy(prompt_text: str, run_date: str, **kwargs: Any) -> str:
+                built = rdr.build_research_prompt(
+                    prompt_text,
+                    run_date,
+                    recent_refs=kwargs.get("recent_refs"),
+                    cross_domain_items=kwargs.get("cross_domain_items"),
+                    recent_hypotheses=kwargs.get("recent_hypotheses"),
+                    community_buzz_lines=kwargs.get("community_buzz_lines"),
+                )
+                captured_prompts.append(built)
+                return "# Alpha Report\n\n## 要点サマリー (TL;DR)\n- ok\n"
+
+            fetch_calls = 0
+
+            def fake_comm_fetcher(_date: str):
+                nonlocal fetch_calls
+                fetch_calls += 1
+                return buzz
+
+            with mock.patch.object(rdr, "run_agy_prompt", side_effect=fake_run_agy):
+                rc = rdr.run_daily(
+                    prompts_dir=prompts_dir,
+                    output_root=output_root,
+                    dashboard_reports_dir=dash_dir,
+                    run_date="2026-11-15",
+                    community_fetcher=fake_comm_fetcher,
+                )
+            self.assertEqual(rc, 0)
+            self.assertEqual(fetch_calls, 1)
+            self.assertTrue((output_root / "2026-11-15" / "community_buzz.json").is_file())
+            self.assertIn("Serving Qwen3 at 500 tok/s", captured_prompts[0])
+
+            # Second forced run with enable_community=False omits buzz injection
+            captured_prompts.clear()
+            with mock.patch.object(rdr, "run_agy_prompt", side_effect=fake_run_agy):
+                rc2 = rdr.run_daily(
+                    prompts_dir=prompts_dir,
+                    output_root=output_root,
+                    dashboard_reports_dir=dash_dir,
+                    run_date="2026-11-15",
+                    force=True,
+                    enable_community=False,
+                    community_fetcher=fake_comm_fetcher,
+                )
+            self.assertEqual(rc2, 0)
+            self.assertEqual(fetch_calls, 1)
+            self.assertNotIn("【補助シグナル: 本日のコミュニティ定量バズ", captured_prompts[0])
 
 
 if __name__ == "__main__":
