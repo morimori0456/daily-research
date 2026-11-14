@@ -830,6 +830,79 @@ print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\
             self.assertNotIn("$\\rightarrow$", rerendered_html)
             self.assertIn("→ テスト", rerendered_html)
 
+    def test_broken_stdout_does_not_mark_completed_prompt_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir, output_root, dash_dir = self._setup_workspace(root)
+
+            class FailingStdout(io.StringIO):
+                def write(self, s: str) -> int:
+                    if "[ok]" in s:
+                        raise OSError(5, "Input/output error")
+                    return super().write(s)
+
+            failing_out = FailingStdout()
+            with contextlib.redirect_stdout(failing_out):
+                rc = rdr.run_daily(
+                    prompts_dir=prompts_dir,
+                    output_root=output_root,
+                    dashboard_reports_dir=dash_dir,
+                    run_date="2026-11-14",
+                    only="01",
+                    runner=lambda _txt, _d, _t: "# 正常出力\n\n## 要点サマリー (TL;DR)\n- OK\n",
+                )
+            self.assertEqual(rc, 0)
+            state = json.loads((output_root / "2026-11-14" / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state["prompts"]["01-alpha"]["status"], "completed")
+            self.assertIsNone(state["prompts"]["01-alpha"]["error"])
+            self.assertTrue((dash_dir / "20261114-01-alpha.html").is_file())
+
+    def test_rerender_heals_failed_state_to_completed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir, output_root, dash_dir = self._setup_workspace(root)
+            day_dir = output_root / "2026-11-14"
+            day_dir.mkdir(parents=True)
+            md_path = day_dir / "20261114-01-alpha.md"
+            md_path.write_text("# 再描画テスト\n\n## 要点サマリー (TL;DR)\n- 復旧確認\n", encoding="utf-8")
+            state_path = day_dir / "state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "date": "2026-11-14",
+                        "updated_at": "2026-11-14T20:50:48+09:00",
+                        "prompts": {
+                            "01-alpha": {
+                                "prompt_file": "01-alpha.txt",
+                                "slug": "01-alpha",
+                                "status": "failed",
+                                "started_at": "2026-11-14T20:44:28+09:00",
+                                "finished_at": "2026-11-14T20:50:48+09:00",
+                                "markdown_path": str(md_path),
+                                "html_path": str(day_dir / "20261114-01-alpha.html"),
+                                "dashboard_html_path": str(dash_dir / "20261114-01-alpha.html"),
+                                "error": "[Errno 5] Input/output error",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rc = rdr.run_daily(
+                prompts_dir=prompts_dir,
+                output_root=output_root,
+                dashboard_reports_dir=dash_dir,
+                run_date="2026-11-14",
+                only="01",
+                rerender=True,
+            )
+            self.assertEqual(rc, 0)
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["prompts"]["01-alpha"]["status"], "completed")
+            self.assertIsNone(state["prompts"]["01-alpha"]["error"])
+            self.assertEqual(state["prompts"]["01-alpha"]["started_at"], "2026-11-14T20:44:28+09:00")
+            self.assertTrue((dash_dir / "20261114-01-alpha.html").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

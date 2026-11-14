@@ -113,6 +113,15 @@ def _now_jst() -> dt.datetime:
     return dt.datetime.now(JST)
 
 
+def _safe_log(message: str, *, stream: Any = None) -> None:
+    """Write a log line without raising if stdout/stderr is closed or detached."""
+    target = sys.stdout if stream is None else stream
+    try:
+        print(message, file=target, flush=True)
+    except (BrokenPipeError, OSError):
+        pass
+
+
 def _atomic_write_text(path: Path, content: str, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
@@ -1204,6 +1213,30 @@ def save_state(state_path: Path, state: dict[str, Any]) -> None:
     _atomic_write_text(state_path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
 
 
+def _build_prompt_state(
+    spec: PromptSpec,
+    *,
+    status: str,
+    started_at: str,
+    finished_at: str,
+    md_path: Path,
+    html_path: Path,
+    dash_path: Path,
+    error: str | None,
+) -> dict[str, Any]:
+    return {
+        "prompt_file": spec.path.name,
+        "slug": spec.slug,
+        "status": status,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "markdown_path": str(md_path),
+        "html_path": str(html_path),
+        "dashboard_html_path": str(dash_path),
+        "error": error,
+    }
+
+
 def rerender_daily_reports(
     *,
     selected: Sequence[PromptSpec],
@@ -1211,6 +1244,8 @@ def rerender_daily_reports(
     dashboard_reports_dir: Path,
     css_path: Path,
     effective_date: str,
+    state_path: Path | None = None,
+    state: dict[str, Any] | None = None,
 ) -> int:
     """Re-render existing Markdown reports for `effective_date` to HTML and Dashboard."""
     if not day_output_dir.is_dir():
@@ -1221,7 +1256,7 @@ def rerender_daily_reports(
     for spec in selected:
         md_path = day_output_dir / f"{compact_date}-{spec.slug}.md"
         if not md_path.is_file():
-            print(f"[skip] {spec.slug} (missing {md_path})")
+            _safe_log(f"[skip] {spec.slug} (missing {md_path})")
             continue
         markdown_out = md_path.read_text(encoding="utf-8")
         generated_at = _now_jst().isoformat(timespec="seconds")
@@ -1236,8 +1271,26 @@ def rerender_daily_reports(
         dash_path = dashboard_reports_dir / f"{compact_date}-{spec.slug}.html"
         _atomic_write_text(html_path, html_out)
         _atomic_write_text(dash_path, html_out)
+        if state is not None and state_path is not None:
+            existing = state["prompts"].get(spec.slug, {})
+            existing_finished = (
+                existing.get("finished_at")
+                if existing.get("status") == "completed" and existing.get("finished_at")
+                else generated_at
+            )
+            state["prompts"][spec.slug] = _build_prompt_state(
+                spec,
+                status="completed",
+                started_at=existing.get("started_at") or generated_at,
+                finished_at=existing_finished,
+                md_path=md_path,
+                html_path=html_path,
+                dash_path=dash_path,
+                error=None,
+            )
+            save_state(state_path, state)
         rendered_count += 1
-        print(f"[rerender] {spec.slug} -> {dash_path}")
+        _safe_log(f"[rerender] {spec.slug} -> {dash_path}")
     return 0 if rendered_count > 0 else 1
 
 
@@ -1315,6 +1368,8 @@ def run_daily(
             dashboard_reports_dir=dashboard_reports_dir,
             css_path=css_path,
             effective_date=effective_date,
+            state_path=state_path,
+            state=state,
         )
 
     day_output_dir.mkdir(parents=True, exist_ok=True)
@@ -1324,7 +1379,7 @@ def run_daily(
     for spec in selected:
         existing = state["prompts"].get(spec.slug, {})
         if existing.get("status") == "completed" and not force:
-            print(f"[skip] {spec.slug} (already completed for {effective_date})")
+            _safe_log(f"[skip] {spec.slug} (already completed for {effective_date})")
             continue
 
         started_at = _now_jst().isoformat(timespec="seconds")
@@ -1332,7 +1387,7 @@ def run_daily(
         html_path = day_output_dir / f"{compact_date}-{spec.slug}.html"
         dash_path = dashboard_reports_dir / f"{compact_date}-{spec.slug}.html"
         recent_refs = collect_recent_reported_refs(output_root, spec.slug, effective_date)
-        print(f"[run] {spec.slug} (timeout={timeout_sec}s, recent_refs={len(recent_refs)})")
+        _safe_log(f"[run] {spec.slug} (timeout={timeout_sec}s, recent_refs={len(recent_refs)})")
 
         try:
             if runner is not None:
@@ -1355,49 +1410,47 @@ def run_daily(
             _atomic_write_text(md_path, markdown_out)
             _atomic_write_text(html_path, html_out)
             _atomic_write_text(dash_path, html_out)
-            state["prompts"][spec.slug] = {
-                "prompt_file": spec.path.name,
-                "slug": spec.slug,
-                "status": "completed",
-                "started_at": started_at,
-                "finished_at": _now_jst().isoformat(timespec="seconds"),
-                "markdown_path": str(md_path),
-                "html_path": str(html_path),
-                "dashboard_html_path": str(dash_path),
-                "error": None,
-            }
+            state["prompts"][spec.slug] = _build_prompt_state(
+                spec,
+                status="completed",
+                started_at=started_at,
+                finished_at=_now_jst().isoformat(timespec="seconds"),
+                md_path=md_path,
+                html_path=html_path,
+                dash_path=dash_path,
+                error=None,
+            )
             save_state(state_path, state)
-            print(f"[ok] {spec.slug} -> {dash_path}")
         except (InterruptedError, KeyboardInterrupt) as exc:
-            state["prompts"][spec.slug] = {
-                "prompt_file": spec.path.name,
-                "slug": spec.slug,
-                "status": "failed",
-                "started_at": started_at,
-                "finished_at": _now_jst().isoformat(timespec="seconds"),
-                "markdown_path": str(md_path),
-                "html_path": str(html_path),
-                "dashboard_html_path": str(dash_path),
-                "error": str(exc) or "interrupted",
-            }
+            state["prompts"][spec.slug] = _build_prompt_state(
+                spec,
+                status="failed",
+                started_at=started_at,
+                finished_at=_now_jst().isoformat(timespec="seconds"),
+                md_path=md_path,
+                html_path=html_path,
+                dash_path=dash_path,
+                error=str(exc) or "interrupted",
+            )
             save_state(state_path, state)
-            print(f"[interrupted] {spec.slug}: {exc}", file=sys.stderr)
+            _safe_log(f"[interrupted] {spec.slug}: {exc}", stream=sys.stderr)
             return 1
         except Exception as exc:
             failures += 1
-            state["prompts"][spec.slug] = {
-                "prompt_file": spec.path.name,
-                "slug": spec.slug,
-                "status": "failed",
-                "started_at": started_at,
-                "finished_at": _now_jst().isoformat(timespec="seconds"),
-                "markdown_path": str(md_path),
-                "html_path": str(html_path),
-                "dashboard_html_path": str(dash_path),
-                "error": str(exc),
-            }
+            state["prompts"][spec.slug] = _build_prompt_state(
+                spec,
+                status="failed",
+                started_at=started_at,
+                finished_at=_now_jst().isoformat(timespec="seconds"),
+                md_path=md_path,
+                html_path=html_path,
+                dash_path=dash_path,
+                error=str(exc),
+            )
             save_state(state_path, state)
-            print(f"[failed] {spec.slug}: {exc}", file=sys.stderr)
+            _safe_log(f"[failed] {spec.slug}: {exc}", stream=sys.stderr)
+        else:
+            _safe_log(f"[ok] {spec.slug} -> {dash_path}")
 
     return 1 if failures else 0
 
