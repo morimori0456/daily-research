@@ -705,7 +705,7 @@ print(json.dumps({{"status": "SUCCESS", "response": "## 調査結果\\n\\n- テ�
 import json, sys
 with open({str(calls_file)!r}, "a", encoding="utf-8") as fh:
     fh.write(json.dumps(sys.argv[1:]) + "\\n")
-if "--model" in sys.argv and sys.argv[sys.argv.index("--model") + 1] == "gemini-4-hydrogen-high":
+if "--model" in sys.argv and sys.argv[sys.argv.index("--model") + 1] == "gemini-4-hydrogen-medium":
     print(json.dumps({{"status": "SUCCESS", "response": "# Fallback OK\\n\\n## 要点サマリー (TL;DR)\\n- ok"}}))
     sys.exit(0)
 sys.stderr.write('AGY_ERROR: {{"status":"RESOURCE_EXHAUSTED","short_error":"RESOURCE_EXHAUSTED (code 429)"}}\\n')
@@ -724,11 +724,11 @@ sys.exit(3)
                     source_cli_dir=cli_dir,
                 )
             self.assertIn("Fallback OK", out)
-            self.assertIn("falling back to gemini-4-hydrogen-high", stderr_buf.getvalue())
+            self.assertIn("falling back to gemini-4-hydrogen-medium", stderr_buf.getvalue())
             calls = [json.loads(line) for line in calls_file.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(calls), 2)
-            self.assertNotIn("--model", calls[0])
-            self.assertIn("gemini-4-hydrogen-high", calls[1])
+            self.assertIn("gemini-4-hydrogen-high", calls[0])
+            self.assertIn("gemini-4-hydrogen-medium", calls[1])
 
     def test_run_agy_prompt_rejects_denied_actions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -971,18 +971,24 @@ print(json.dumps({"status": "SUCCESS", "response": "## CLIテスト\\n\\n- 完�
                 encoding="utf-8",
             )
 
-            captured_prompt = root / "captured_prompt.txt"
+            captured_calls = root / "captured_calls.jsonl"
             bin_dir = root / "bin"
             bin_dir.mkdir()
             fake_agy = bin_dir / "agy"
             fake_agy.write_text(
                 f"""#!/usr/bin/env python3
 import json, sys
+model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+prompt_arg = ""
 for arg in sys.argv[1:]:
     if arg.startswith("--print="):
-        with open({str(captured_prompt)!r}, "w", encoding="utf-8") as fh:
-            fh.write(arg[len("--print="):])
-print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\\n## 要点サマリー (TL;DR)\\n- [https://example.com/new](https://example.com/new) を確認"}}))
+        prompt_arg = arg[len("--print="):]
+with open({str(captured_calls)!r}, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps({{"model": model, "prompt": prompt_arg}}) + "\\n")
+if model == "gemini-4-argon-low":
+    print(json.dumps({{"status": "SUCCESS", "response": "## Argon 品質レビュー所見\\n\\n- **判定**: `PASS`\\n- 新規URL確認済み\\n- 異常なし"}}))
+else:
+    print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\\n## 要点サマリー (TL;DR)\\n- [https://example.com/new](https://example.com/new) を確認"}}))
 """,
                 encoding="utf-8",
             )
@@ -1014,7 +1020,13 @@ print(json.dumps({{"status": "SUCCESS", "response": "# 再実行レポート\\n\
                 check=False,
             )
             self.assertEqual(proc.returncode, 0, msg=proc.stderr)
-            prompt_sent = captured_prompt.read_text(encoding="utf-8")
+            recorded_calls = [
+                json.loads(line) for line in captured_calls.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(len(recorded_calls), 2)
+            self.assertEqual(recorded_calls[0]["model"], "gemini-4-hydrogen-high")
+            self.assertEqual(recorded_calls[1]["model"], "gemini-4-argon-low")
+            prompt_sent = recorded_calls[0]["prompt"]
             self.assertIn("arXiv:2611.55555", prompt_sent)
             self.assertIn("https://arxiv.org/abs/2611.55555", prompt_sent)
             self.assertNotIn("https://example.com/today-only", prompt_sent)
@@ -1421,6 +1433,7 @@ class CommunityBuzzTests(unittest.TestCase):
                     output_root=output_root,
                     dashboard_reports_dir=dash_dir,
                     run_date="2026-11-15",
+                    review_model=None,
                     community_fetcher=fake_comm_fetcher,
                 )
             self.assertEqual(rc, 0)
@@ -1437,12 +1450,315 @@ class CommunityBuzzTests(unittest.TestCase):
                     dashboard_reports_dir=dash_dir,
                     run_date="2026-11-15",
                     force=True,
+                    review_model=None,
                     enable_community=False,
                     community_fetcher=fake_comm_fetcher,
                 )
             self.assertEqual(rc2, 0)
             self.assertEqual(fetch_calls, 1)
             self.assertNotIn("【補助シグナル: 本日のコミュニティ定量バズ", captured_prompts[0])
+
+
+class HydrogenArgonSplitAndReviewTests(unittest.TestCase):
+    def _setup_cli_env(self, root: Path, agy_script: str) -> tuple[Path, Path, Path, dict[str, str]]:
+        prompts_dir = root / "prompts"
+        output_root = root / "output"
+        dash_root = root / "dashboard"
+        prompts_dir.mkdir(parents=True)
+        (prompts_dir / "02-beta.txt").write_text("# Beta 調査\n詳細を調べてください。", encoding="utf-8")
+
+        fake_home = root / "home"
+        cli_dir = fake_home / ".gemini" / "antigravity-cli"
+        cli_dir.mkdir(parents=True)
+        (cli_dir / "antigravity-oauth-token").write_text("oauth-tok", encoding="utf-8")
+        (cli_dir / "bin").mkdir()
+        (cli_dir / "builtin").mkdir()
+
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        fake_agy = bin_dir / "agy"
+        fake_agy.write_text(agy_script, encoding="utf-8")
+        fake_agy.chmod(0o755)
+
+        env = os.environ.copy()
+        env["HOME"] = str(fake_home)
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["DASHBOARD_DATA"] = str(dash_root)
+        env["DAILY_RESEARCH_PROMPTS_DIR"] = str(prompts_dir)
+        env["DAILY_RESEARCH_OUTPUT_DIR"] = str(output_root)
+        env.pop("DAILY_RESEARCH_MODEL", None)
+        env.pop("DAILY_RESEARCH_FALLBACK_MODEL", None)
+        env.pop("DAILY_RESEARCH_REVIEW_MODEL", None)
+        return prompts_dir, output_root, dash_root, env
+
+    def test_default_models_and_parse_args(self) -> None:
+        self.assertEqual(rdr.DEFAULT_RESEARCH_MODEL, "gemini-4-hydrogen-high")
+        self.assertEqual(rdr.DEFAULT_FALLBACK_MODEL, "gemini-4-hydrogen-medium")
+        self.assertEqual(rdr.DEFAULT_REVIEW_MODEL, "gemini-4-argon-low")
+        self.assertEqual(rdr.DEFAULT_REVIEW_TIMEOUT_SEC, 300)
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            for key in ("DAILY_RESEARCH_MODEL", "DAILY_RESEARCH_FALLBACK_MODEL", "DAILY_RESEARCH_REVIEW_MODEL"):
+                os.environ.pop(key, None)
+            args = rdr.parse_args([])
+            self.assertEqual(args.model, "gemini-4-hydrogen-high")
+            self.assertEqual(args.fallback_model, "gemini-4-hydrogen-medium")
+            self.assertEqual(args.review_model, "gemini-4-argon-low")
+            self.assertFalse(args.no_review)
+            self.assertEqual(args.review_timeout, 300)
+
+            args_no_rev = rdr.parse_args(["--no-review", "--review-timeout", "120"])
+            self.assertTrue(args_no_rev.no_review)
+            self.assertEqual(args_no_rev.review_timeout, 120)
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "DAILY_RESEARCH_MODEL": "gemini-4-hydrogen-xhigh",
+                "DAILY_RESEARCH_FALLBACK_MODEL": "gemini-4-hydrogen-low",
+                "DAILY_RESEARCH_REVIEW_MODEL": "gemini-4-argon-medium",
+            },
+            clear=False,
+        ):
+            args_env = rdr.parse_args([])
+            self.assertEqual(args_env.model, "gemini-4-hydrogen-xhigh")
+            self.assertEqual(args_env.fallback_model, "gemini-4-hydrogen-low")
+            self.assertEqual(args_env.review_model, "gemini-4-argon-medium")
+
+    def test_argon_review_success_appends_section_sanitizes_and_records_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls_log = root / "calls.jsonl"
+            agy_script = f"""#!/usr/bin/env python3
+import json, sys
+model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+prompt = next((a[len("--print="):] for a in sys.argv[1:] if a.startswith("--print=")), "")
+with open({str(calls_log)!r}, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps({{"model": model, "prompt": prompt}}) + "\\n")
+if model == "gemini-4-argon-low":
+    print(json.dumps({{"status": "SUCCESS", "response": "```markdown\\n### Argon 品質レビュー所見\\n\\n- **判定**: `PASS_WITH_NOTES`\\n- [L2] 根拠の整合性を確認 완료\\n- コミュニティ探索メモも明瞭です。\\n```"}}))
+else:
+    print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n## 要点サマリー (TL;DR)\\n- [L2: 公式リリース・アブストラクト・仕様確認済] 検証済み\\n\\n## Argon 品質レビュー所見\\n\\n- 古い見出し"}}))
+"""
+            _prompts_dir, output_root, dash_root, env = self._setup_cli_env(root, agy_script)
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                    "--timeout",
+                    "10",
+                    "--no-community",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+            self.assertIn("stripped 1 Hangul token(s) from review", proc.stderr)
+
+            calls = [json.loads(line) for line in calls_log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([c["model"] for c in calls], ["gemini-4-hydrogen-high", "gemini-4-argon-low"])
+            self.assertIn("監査対象プロンプト: 02-beta", calls[1]["prompt"])
+
+            md_text = (output_root / "2026-11-15" / "20261115-02-beta.md").read_text(encoding="utf-8")
+            html_text = (dash_root / "reports" / "daily-research" / "20261115-02-beta.html").read_text(encoding="utf-8")
+            self.assertEqual(md_text.count("## Argon 品質レビュー所見"), 1)
+            self.assertNotIn("古い見出し", md_text)
+            self.assertIn("PASS_WITH_NOTES", md_text)
+            self.assertNotRegex(md_text, r"[\uAC00-\uD7AF]")
+            self.assertIn("Argon 品質レビュー所見", html_text)
+            self.assertIn("PASS_WITH_NOTES", html_text)
+
+            state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
+            entry = state["prompts"]["02-beta"]
+            self.assertEqual(entry["status"], "completed")
+            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(entry["review_model"], "gemini-4-argon-low")
+            self.assertEqual(entry["review_status"], "completed")
+            self.assertIsNone(entry["review_error"])
+
+    def test_argon_review_quota_exhausted_and_error_fallbacks_are_non_fatal(self) -> None:
+        # 1) Quota exhausted (429 / RESOURCE_EXHAUSTED) -> skipped_quota
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            agy_script = """#!/usr/bin/env python3
+import json, sys
+model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+if model == "gemini-4-argon-low":
+    sys.stderr.write('AGY_ERROR: {"status":"RESOURCE_EXHAUSTED","short_error":"RESOURCE_EXHAUSTED (code 429)"}\\n')
+    sys.exit(3)
+print(json.dumps({"status": "SUCCESS", "response": "# Beta レポート\\n\\n## 要点サマリー (TL;DR)\\n- Hydrogen 本文"}))
+"""
+            _prompts_dir, output_root, dash_root, env = self._setup_cli_env(root, agy_script)
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                    "--timeout",
+                    "10",
+                    "--no-community",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+            self.assertIn("Argon review skipped due to quota", proc.stderr)
+            md_text = (output_root / "2026-11-15" / "20261115-02-beta.md").read_text(encoding="utf-8")
+            html_text = (dash_root / "reports" / "daily-research" / "20261115-02-beta.html").read_text(encoding="utf-8")
+            self.assertIn("Hydrogen 本文", md_text)
+            self.assertIn("Hydrogen 本文", html_text)
+            self.assertNotIn("Argon 品質レビュー所見", md_text)
+
+            state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
+            entry = state["prompts"]["02-beta"]
+            self.assertEqual(entry["status"], "completed")
+            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(entry["review_model"], "gemini-4-argon-low")
+            self.assertEqual(entry["review_status"], "skipped_quota")
+            self.assertIn("429", entry["review_error"] or "")
+
+        # 2) Non-quota failure (exit 1 / timeout) -> failed, still saves research output
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            agy_script = """#!/usr/bin/env python3
+import json, sys
+model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+if model == "gemini-4-argon-low":
+    sys.stderr.write("internal review error\\n")
+    sys.exit(1)
+print(json.dumps({"status": "SUCCESS", "response": "# Beta レポート\\n\\n## 要点サマリー (TL;DR)\\n- Hydrogen 出力保持"}))
+"""
+            _prompts_dir, output_root, dash_root, env = self._setup_cli_env(root, agy_script)
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                    "--timeout",
+                    "10",
+                    "--no-community",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+            self.assertIn("Argon review failed", proc.stderr)
+            md_text = (output_root / "2026-11-15" / "20261115-02-beta.md").read_text(encoding="utf-8")
+            self.assertIn("Hydrogen 出力保持", md_text)
+            self.assertTrue((dash_root / "reports" / "daily-research" / "20261115-02-beta.html").is_file())
+            state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
+            entry = state["prompts"]["02-beta"]
+            self.assertEqual(entry["status"], "completed")
+            self.assertEqual(entry["review_status"], "failed")
+            self.assertIn("internal review error", entry["review_error"] or "")
+
+    def test_no_review_flag_and_dry_run_and_rerender_skip_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls_log = root / "calls.jsonl"
+            agy_script = f"""#!/usr/bin/env python3
+import json, sys
+model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+with open({str(calls_log)!r}, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps({{"model": model}}) + "\\n")
+print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n## 要点サマリー (TL;DR)\\n- レビュー無効"}}))
+"""
+            _prompts_dir, output_root, dash_root, env = self._setup_cli_env(root, agy_script)
+
+            # --dry-run does not call agy and reports hydrogen/argon model plan
+            dry_proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--dry-run",
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(dry_proc.returncode, 0, msg=dry_proc.stderr)
+            self.assertFalse(calls_log.exists())
+            dry_plan = json.loads(dry_proc.stdout)
+            self.assertEqual(dry_plan["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(dry_plan["fallback_model"], "gemini-4-hydrogen-medium")
+            self.assertEqual(dry_plan["review_model"], "gemini-4-argon-low")
+            self.assertTrue(dry_plan["review_enabled"])
+            self.assertEqual(dry_plan["review_timeout_sec"], 300)
+
+            # --no-review disables review invocation and sets review_status == "disabled"
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                    "--no-review",
+                    "--timeout",
+                    "10",
+                    "--no-community",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+            calls = [json.loads(line) for line in calls_log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([c["model"] for c in calls], ["gemini-4-hydrogen-high"])
+            state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
+            entry = state["prompts"]["02-beta"]
+            self.assertEqual(entry["status"], "completed")
+            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertIsNone(entry["review_model"])
+            self.assertEqual(entry["review_status"], "disabled")
+            self.assertIsNone(entry["review_error"])
+
+            # --rerender never calls review (even without --no-review) and preserves state metadata
+            calls_log.unlink()
+            rerender_proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(DAILY_RESEARCH_DIR / "run_daily_research.py"),
+                    "--rerender",
+                    "--only",
+                    "02",
+                    "--date",
+                    "2026-11-15",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(rerender_proc.returncode, 0, msg=rerender_proc.stderr)
+            self.assertFalse(calls_log.exists())
+            state_after = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state_after["prompts"]["02-beta"]["review_status"], "disabled")
+            self.assertEqual(state_after["prompts"]["02-beta"]["research_model"], "gemini-4-hydrogen-high")
+            self.assertTrue((dash_root / "reports" / "daily-research" / "20261115-02-beta.html").is_file())
 
 
 if __name__ == "__main__":

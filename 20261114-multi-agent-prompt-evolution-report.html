@@ -1193,7 +1193,7 @@ pre.mb-diff .ctx::before { content: " "; }
 
 <ul>
   <li><strong><code>read_url</code> ツールの不在</strong>：現在も <code>agy --mode plan</code> には <code>read_url</code> が提供されていないため、多段階 <code>search_web</code> クエリで代替しています。arXiv HTML 全文や企業テックブログ本文を直接読める環境が整備されれば、<code>[L2]</code> のさらに深い検証（<code>[L3]</code> 相当）が可能になります。</li>
-  <li><strong>Argon クォータ枯渇とフォールバック運用</strong>：Phase 4 の本番実行で <code>agy</code> 既定モデル（Argon）が <code>RESOURCE_EXHAUSTED (429)</code> に達したため、ランナーへ <code>--model</code> オプションと 429 検知時の <code>gemini-4-hydrogen-high</code> 自動フォールバックを組み込みました。<code>daily-gemini-research.timer</code> による毎朝実行では、既定枠が枯渇していても自動完走するかを引き続き監視します。</li>
+  <li><strong>Hydrogen 調査＋Argon 事後品質レビューへの標準化</strong>：Phase 4 の本番実行で <code>agy</code> 既定モデル（Argon）が <code>RESOURCE_EXHAUSTED (429)</code> に達した教訓を受け、<code>run_daily_research.py</code> のデフォルト調査モデルを <code>gemini-4-hydrogen-high</code>（429 フォールバック <code>gemini-4-hydrogen-medium</code>）へ切り替え、調査本枠で Argon 週間クォータを消費しない構成にしました。あわせて、調査生成後に <code>gemini-4-argon-low</code>（<code>--review-model</code> / <code>--no-review</code> で制御可）で読み取り専用の事後品質監査（<code>## Argon 品質レビュー所見</code> 追記）を実行し、Argon の 429・タイムアウト・エラー時でも日次レポート保存は失敗させず <code>state.json</code> の <code>review_status</code> へ記録する非致命フォールバックを組み込んでいます。</li>
   <li><strong>ハングルサニタイズと毎朝 05:00 JST の実行順序</strong>：<code>sanitize_hangul()</code> による自動除去・記録を導入し、今回の全 7 本出力では <code>[\uAC00-\uD7AF]</code> 一致 0 件を確認しました。また 7 本化に伴い <code>04</code>・<code>07</code>・<code>06</code> の順の当日参照連携が有効に働くため、次回以降の定期実行では <code>01</code>〜<code>05</code>, <code>07</code>, <code>06</code> の順次完走と <code>TimeoutStartSec=130min</code> 内の所要時間推移を数日観測します。</li>
 </ul>
 
@@ -1203,7 +1203,7 @@ pre.mb-diff .ctx::before { content: " "; }
   <h2 id="glossary-title">用語リスト</h2>
   <dl>
     <dt>agy (Antigravity CLI)</dt>
-    <dd>ローカルで自律エージェントを実行する CLI。本基盤では隔離 HOME と strict 権限で Web 検索のみを許可する。429 時は Hydrogen へ自動切替する。</dd>
+    <dd>ローカルで自律エージェントを実行する CLI。本基盤では隔離 HOME と strict 権限で Web 検索のみを許可する。既定の調査は Hydrogen High（429 時は Hydrogen Medium）で実行し、事後レビューに Argon Low を用いる。</dd>
     <dt>FDE (Forward Deployed Engineer)</dt>
     <dd>顧客先へ深く入り込み、AI 基盤の本番統合・Eval 設計・ガバナンス構築までをやり切るエンジニア職。</dd>
     <dt>L1 / L2 確認レベル</dt>
