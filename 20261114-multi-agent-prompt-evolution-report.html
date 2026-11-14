@@ -662,21 +662,22 @@ pre.mb-diff .ctx::before { content: " "; }
 <header class="mb-header">
   <div>
     <h1>マルチエージェントによる日次リサーチ基盤の判断と進化レポート</h1>
-    <p class="mb-meta-line">2026-11-14 / branch: feature/1-daily-prompts-research / commits: 47ccea0, 23b4ec7, 77447f1, a644925</p>
+    <p class="mb-meta-line">2026-11-14 / branch: feature/1-daily-prompts-research / commits: 47ccea0, 23b4ec7, 77447f1, a644925 + v4 (uncommitted preview)</p>
   </div>
 </header>
 
 <p class="mb-lede">
-  <code>p1:~/tools/gemini_auto/</code> で運用断念されていた手動 Edge CDP 方式の週次プロンプト4本を、ローカル <code>agy</code> CLI と systemd timer による毎朝5時 JST 自動パイプラインへ移行し、複数モデル（Gemini Argon/Hydrogen・Claude Opus/Fable 5.2・Codex Sol）による2段階の独立レビューと実実行検証を経て、FDE 転職・活躍と自動運転ブレイクスルー創出に直結する5本の戦略リサーチ基盤へ進化させた全記録です。
+  <code>p1:~/tools/gemini_auto/</code> で運用断念されていた手動 Edge CDP 方式の週次プロンプト4本を、ローカル <code>agy</code> CLI と systemd timer による毎朝5時 JST 自動パイプラインへ移行し、複数モデル（Gemini Argon/Hydrogen・Claude Opus/Fable 5.2・Codex Sol）による多段階レビューと <code>p1</code> Claude Fable 5.2 設計診断を経て、FDE 転職・自動運転ブレイクスルー・Agent 制御構造（Loop / Graph Engineering）まで網羅する7本構成（v4）へ進化させた全記録です。
 </p>
 
 <nav class="mb-toc">
   <ol>
-    <li><a href="#summary">背景と要点：3フェーズの進化と意思決定</a></li>
+    <li><a href="#summary">背景と要点：4フェーズの進化と意思決定</a></li>
     <li><a href="#agents">参加エージェントの役割・モデル配分と判断軸</a></li>
     <li><a href="#phase1">Phase 1：初期移行と初回実行（47ccea0）</a></li>
     <li><a href="#phase2">Phase 2：日次バッチ化・品質レビューと改修（23b4ec7）</a></li>
     <li><a href="#phase3">Phase 3：戦略目標レビュー（FDE・自動運転）と改修（77447f1, a644925）</a></li>
+    <li><a href="#phase4">Phase 4：v4 7本構成への再設計と実証（04/05/06/07）</a></li>
     <li><a href="#diffs">Before / After 具体差分：プロンプト・出力・堅牢化</a></li>
     <li><a href="#limits">検証結果・残存課題と今後の運用</a></li>
   </ol>
@@ -686,8 +687,8 @@ pre.mb-diff .ctx::before { content: " "; }
   <ul>
     <li><strong>アーキテクチャ転換（Phase 1 / <code>47ccea0</code>）</strong>：<code>p1</code> のブラウザ依存 Edge CDP 方式を廃し、隔離 <code>HOME</code> 上の <code>agy --mode plan --sandbox</code> と <code>systemd</code> 毎朝5時タイマー、CSP 準拠 HTML 変換、Dashboard Reports 自動配信を構築した。</li>
     <li><strong>日次適合と構造修正（Phase 2 / <code>23b4ec7</code>）</strong>：Claude Code (<code>opus</code>) の HTML パーサ実装踏み込みと Codex (<code>gpt-6.1-sol</code>) の 7日探索窓・重複排除・インジェクション防御提案を統合し、<code>render_inline</code> の二重リンクと <code>03</code> の要約崩れを解消した。</li>
-    <li><strong>戦略目標への照準（Phase 3 / <code>77447f1</code>）</strong>：Argon Medium・Codex Sol・<code>p1</code> Claude Fable 5.2 の3者が「<code>read_url</code> 不在による表層スニペット断定」「FDE 本番業務視点の欠如」「自動運転論文の成功カタログ止まり」を突き、<em>L1/L2 確認レベル分離</em>・評価条件監査・車載計算予算・<code>05</code> 統合戦略プロンプトを導入した。</li>
-    <li><strong>運用堅牢化と実証（<code>a644925</code>）</strong>：PTY 切断時の <code>OSError (EIO)</code> で完了済み <code>state.json</code> が失敗上書きされるバグを <code>_safe_log()</code> で修正し、単体テスト 20/20 PASS と 5本全件の本番出力・Dashboard API 配信を確認した。</li>
+    <li><strong>戦略目標への照準（Phase 3 / <code>77447f1</code>, <code>a644925</code>）</strong>：Argon Medium・Codex Sol・<code>p1</code> Claude Fable 5.2 の3者が突き止めた「表層スニペット断定」「FDE 本番業務視点の欠如」「AD 成功カタログ止まり」に対し、<em>L1/L2 確認レベル分離</em>・<code>_safe_log()</code> PTY 切断耐性・戦略プロンプトを導入した。</li>
+    <li><strong>7本構成への構造拡張（Phase 4 / v4）</strong>：旧 <code>04</code> の Loop/Graph 取りこぼし問題を受け、<code>p1</code> Claude Fable 5.2 の 6 原因診断に沿って <strong>7本構成（Plan B）</strong>を採用。<code>04</code> の純化＋曜日ローテーション、<code>05</code>（FDE・企業本番導入）と <code>06</code>（AD 未解決ボトルネック×異分野転用）の分割、<code>07</code>（Loop &amp; Graph 2段階探索・<code>探索カバレッジ</code>）新設、<code>04</code> から <code>07</code> への重複排除、<code>03/07</code> から <code>06</code> への異分野連携、ハングルサニタイズ、Argon 429 時の Hydrogen 自動フォールバックを実装し、単体テスト 24/24 PASS と <code>01</code>–<code>07</code> 全件完了・Dashboard API 配信を確認した。</li>
   </ul>
 </div>
 
@@ -696,19 +697,19 @@ pre.mb-diff .ctx::before { content: " "; }
 <div class="mb-wrap">
 <main class="mb-main">
 
-<h2 id="summary">1. 背景と要点：3フェーズの進化と意思決定</h2>
+<h2 id="summary">1. 背景と要点：4フェーズの進化と意思決定</h2>
 
 <p>
   出発点は、踏み台ホスト <code>p1</code> の <code>~/tools/gemini_auto/</code> に置かれていた4本の週次調査プロンプト（<code>01</code> から <code>04</code>）でした。元々は Gemini Deep Research をブラウザの Edge CDP（Chrome DevTools Protocol）経由で半自動操作する前提で書かれていましたが、認証・UI 変更・セッション維持の負担から運用が止まっていました。
 </p>
 
 <p>
-  本プロジェクトでは単にスクリプトをローカルへ移植するだけでなく、<strong>「実装」「実実行」「複数モデルによる独立レビュー」「改修と再実証」</strong>のサイクルを3フェーズにわたって回しました。結果として、調査基盤は単なるニュース収集スクリプトから、確認深度と根拠を明示した意思決定用パイプラインへと作り替わっています。
+  本プロジェクトでは単にスクリプトをローカルへ移植するだけでなく、<strong>「実装」「実実行」「複数モデルによる独立レビュー・設計診断」「改修と再実証」</strong>のサイクルを4フェーズにわたって回しました。結果として、調査基盤は単なるニュース収集スクリプトから、確認深度・検索カバレッジ・クロスドメイン仮説生成を備えた7本構成（<code>01</code>–<code>07</code>）の意思決定用パイプラインへと作り替わっています。
 </p>
 
 <figure class="mb-figure">
   <div class="mb-figure-frame">
-    <svg viewBox="0 0 760 520" width="760">
+    <svg viewBox="0 0 760 656" width="760">
       <g fill="none" stroke="#111110" stroke-width="2">
         <!-- Origin -->
         <rect x="210" y="14" width="340" height="54"/>
@@ -727,11 +728,16 @@ pre.mb-diff .ctx::before { content: " "; }
 
         <!-- Phase 3 -->
         <rect x="70" y="338" width="620" height="104"/>
-        <line x1="380" y1="442" x2="380" y2="466"/>
-        <path d="M375 459 L380 467 L385 459 Z" fill="#111110" stroke="none"/>
+        <line x1="380" y1="442" x2="380" y2="470"/>
+        <path d="M375 463 L380 471 L385 463 Z" fill="#111110" stroke="none"/>
+
+        <!-- Phase 4 -->
+        <rect x="70" y="472" width="620" height="104"/>
+        <line x1="380" y1="576" x2="380" y2="600"/>
+        <path d="M375 593 L380 601 L385 593 Z" fill="#111110" stroke="none"/>
 
         <!-- Final Output -->
-        <rect x="130" y="468" width="500" height="42"/>
+        <rect x="130" y="602" width="500" height="42"/>
       </g>
 
       <g font-family="Ubuntu Sans, Noto Sans JP, sans-serif" fill="#111110" text-anchor="middle">
@@ -752,11 +758,16 @@ pre.mb-diff .ctx::before { content: " "; }
         <text x="380" y="402" font-size="12" fill="#1A1A1A">L1/L2分離・多段階search_web・評価条件監査・Oracle仮説・05統合戦略新設</text>
         <text x="380" y="422" font-size="12" fill="#1A1A1A">_safe_log() で PTY 切断耐性を追加し、全5本完了・テスト 20/20 PASS</text>
 
-        <text x="380" y="494" font-size="13" font-weight="700">成果: 毎朝 05:00 JST 自動実行 (01-05) から Dashboard Reports 配信へ</text>
+        <text x="380" y="495" font-size="14" font-weight="700">Phase 4: v4 7本構成への再設計・Loop/Graph 独立と実証</text>
+        <text x="380" y="516" font-size="12" fill="#1A1A1A">p1 Claude (fable 5.2) 構造診断 + Worker-v4 実装 + Reviewer-v4 監査</text>
+        <text x="380" y="536" font-size="12" fill="#1A1A1A">04 純化+曜日ローテ / 05-06 分割 / 07(Loop・Graph) 新設 / 04-07・03/07-06 連携</text>
+        <text x="380" y="556" font-size="12" fill="#1A1A1A">ハングル自動サニタイズ・429時 Hydrogen 自動切替 / 全7本完了・テスト 24/24 PASS</text>
+
+        <text x="380" y="628" font-size="13" font-weight="700">成果: 毎朝 05:00 JST 自動実行 (01-07) から Dashboard Reports 配信へ</text>
       </g>
     </svg>
   </div>
-  <figcaption>fig.1 3フェーズにわたるエージェント協調と基盤進化の流れ（各コミットは feature/1-daily-prompts-research 上で記録）</figcaption>
+  <figcaption>fig.1 4フェーズにわたるエージェント協調と基盤進化の流れ（feature/1-daily-prompts-research 上で記録）</figcaption>
 </figure>
 
 <table>
@@ -784,6 +795,11 @@ pre.mb-diff .ctx::before { content: " "; }
     <td class="mb-rowlabel">Phase 3 堅牢化</td>
     <td><code>a644925</code>（21:05）</td>
     <td>PTY 切断時の <code>_safe_log()</code> 耐性、<code>--rerender</code> による <code>state.json</code> 復旧、単体テスト 20 件全 PASS</td>
+  </tr>
+  <tr>
+    <td class="mb-rowlabel">Phase 4 v4 7本構成</td>
+    <td>21:16–22:13 実装・実証</td>
+    <td><code>p1</code> Claude Fable 5.2 診断に基づき <code>04</code> 純化・<code>05</code>/<code>06</code> 分割・<code>07</code> Loop/Graph 新設、<code>--model</code>/429 自動フォールバック・ハングル除去、単体テスト 24 件 PASS、全 7 本完了</td>
   </tr>
 </table>
 
@@ -1028,10 +1044,52 @@ pre.mb-diff .ctx::before { content: " "; }
   この不具合に対し <code>worker-v3</code> は、標準出力・標準エラーの <code>BrokenPipeError</code> と <code>OSError</code> を握りつぶす <code>_safe_log()</code> ヘルパーを導入して <code>[ok]</code> ログを <code>try</code> ブロック外の <code>else:</code> へ移動させ、さらに <code>rerender_daily_reports</code> 実行時に既存の <code>state.json</code> を <code>completed</code>（<code>error: null</code>）へ同期修復する <code>_build_prompt_state()</code> を実装しました（<code>a644925</code>）。
 </p>
 
-<h2 id="diffs">6. Before / After 具体差分：プロンプト・出力・堅牢化</h2>
+<h2 id="phase4">6. Phase 4：v4 7本構成への再設計と実証（04/05/06/07）</h2>
 
 <p>
-  プロンプトとランナーの改修がどのように出力の質を変えたかを、3 つの代表的な差分で確認します。まず、<code>03</code>（自動運転論文調査）は Phase 1 の素朴な 4 項目列挙から、Phase 3 では評価パラダイムの分離・監査・失敗モード・車載計算予算・Oracle 反証実験を強制する設計へと進化しました。
+  Phase 3 の成果に対してユーザーから「<code>04</code> が実質 Context / Harness に寄っており、<strong>Loop Engineering / Graph Engineering（制御ループ・状態遷移・知識グラフ駆動エージェント）</strong>が拾えていない」「FDE 観点と自動運転ブレイクスルー観点の <code>05</code> は独立させるべき」という本質的な問題提起がありました。<code>worker-v4</code> は独自にプロンプトを膨らませる前に <code>p1</code> の <code>Claude (fable 5.2)</code> へ構造診断を依頼し、なぜ Loop / Graph が落ちるのかを 6 つの構造原因として切り分けました。
+</p>
+
+<div class="mb-grid-2">
+  <div class="mb-card">
+    <div class="mb-card-title">Claude Fable 5.2 が突き止めた 6 つの取りこぼし原因</div>
+    <ul>
+      <li><strong>タイトルアンカー効果</strong>：旧 <code>04</code> のタイトルと冒頭が <code>Context / Harness</code> に固定され、<code>search_web</code> クエリ生成自体が初期段階でそちらへ偏った。</li>
+      <li><strong>バズワード枠 × 除外則の罠</strong>：「新出の 〜 Engineering」枠を置くと一般語（状態機械、制御ループ、グラフメモリ）が弾かれやすくなった。</li>
+      <li><strong>貪欲停止（Greedy Stopping）</strong>：「計 4〜5 件」上限を <code>Context</code> と <code>Harness</code> が先に埋めてしまい、他の枠へ到達する前に検索が終了した。</li>
+      <li><strong>応用 <code>5a</code>/<code>5b</code> のバイアスとカテゴリ漏れ</strong>：arXiv <code>cs.MA</code>・<code>cs.IR</code>・<code>cs.LG</code> や OSS フレームワーク群が探索対象から抜けていた。</li>
+      <li><strong>Loop 系論文の隠蔽</strong>：<code>Termination Lag</code>（<code>arXiv:2611.14960</code>）等の制御ループ論文は「coding agent」「deep research」等の下位語に隠れ、<code>agent loop</code> 検索では引っかからなかった。</li>
+      <li><strong>1 本詰め込みの危険</strong>：1 本の <code>04</code> に 5 本柱を詰め込むと Context / Harness が常に枠を奪い、拡張領域が引き続き 0 件になる構造が見えた。</li>
+    </ul>
+  </div>
+  <div class="mb-card">
+    <div class="mb-card-title">採用した 7 本構成（Plan B）の設計判断</div>
+    <ul>
+      <li><strong><code>04-context-harness-engineering.txt</code> の純化＋曜日ローテーション</strong>：本枠 4 件を Context / Harness / Eval に純化し、曜日別に 1 本の拡張枠（月: RLVR、火: Multi-Agent、水/木: Security、金: Context/KV、土日: Multimodal &amp; VLA）を追加して競合を遮断した。</li>
+      <li><strong><code>07-agent-control-loop-and-graph-engineering.txt</code> の独立新設</strong>：<code>Phase A</code>（Loop 4 領域＋Graph 4 領域の 8 サブ領域を並列検索）から <code>Phase B</code>（深掘り検証）への 2 段階探索、Loop/Graph 予約枠（最低各 2 件枠）、<code>## 探索カバレッジ</code>（空席の正直な記録）、<code>## 用語ウォッチ</code>、日次語彙ローテーションを導入した。</li>
+      <li><strong><code>05</code> / <code>06</code> の完全分割</strong>：旧 <code>05</code> を廃止し、<code>05</code> を FDE・企業本番導入（0 件許容・給与数値断定禁止）、<code>06</code> を自動運転未解決ボトルネック台帳 × 異分野転用実験（<code>03</code> と <code>07</code> からの自動接続）に分離した。</li>
+      <li><strong>クロスプロンプト連携と堅牢化</strong>：<code>04</code> から <code>07</code> への同日・過去 7 日重複排除、<code>03/07</code> から <code>06</code> への異分野素材注入、<code>HANGUL_RE</code> 自動検知・サニタイズ、および <code>agy</code> 既定 Argon の 429 (<code>RESOURCE_EXHAUSTED</code>) 時に <code>gemini-4-hydrogen-high</code> へ自動切替するフォールバックを実装した。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>実実行検証（<code>04</code>・<code>05</code>・<code>07</code> から <code>06</code> への連結実行）と観測された効果</h3>
+
+<p>
+  <code>07</code> が当日分の <code>04</code> 参照を除外し、<code>06</code> が当日分の <code>03</code> と <code>07</code> の採択成果を取り込めるよう、本番再検証は <code>--only 04,05,07 --force</code> に続けて <code>--only 06 --force</code> の順で実行しました（<code>--model gemini-4-hydrogen-high</code> 指定、全件正常終了）。実出力を検証した結果、v4 設計の狙いがそのまま数値と内容に表れました。
+</p>
+
+<ul>
+  <li><strong><code>07</code> が「隠れていた Loop / Graph 論文・OSS」を確実に捕捉</strong>：旧 <code>04</code> とは独立に実行し（<code>recent_refs=18</code> を自動除外）、Loop 側で <code>Termination Lag</code>（<code>arXiv:2611.14960</code>：正解到達後に中央値 35–60% の冗長ステップを浪費）と <code>openai-agents-js v0.22.0</code>、Graph 側で <code>LEAD-RL</code>（<code>arXiv:2611.17041</code>）・<code>ReTrace</code>（<code>arXiv:2611.14492</code>：ワークフロー蒸留で遅延大幅削減）・<code>LangGraph v1.2.21 / v1.2.22</code> の計 5 件（すべて <code>[L2]</code>）を抽出した。さらに 8 サブ領域の <code>## 探索カバレッジ</code> テーブルで未該当 3 領域（<code>L1</code>・<code>L2</code>・<code>G4</code>）を <code>[空席（該当 L2 なし）]</code> と正直に記録した。</li>
+  <li><strong><code>04</code> の拡張枠ローテーションが機能</strong>：本枠 4 件（<code>Singularity-Bench</code> / <code>Breakwater</code>、<code>Verify by Doing</code>、<code>WikiTrace</code>、<code>MIGRO</code>）に加え、土曜拡張枠として <code>Is Your Robot's Memory Just a Clock?</code>（<code>arXiv:2611.14488</code>：VLA の Phantom Progress とイベント索引メモリ）を拾い上げた。</li>
+  <li><strong><code>07</code> から <code>06</code> への異分野転用パイプラインが接続</strong>：<code>06</code> は <code>cross_domain=9</code> を受け取り、<code>ReTrace</code> と <code>Termination Lag</code> を <code>Triplet Incremental Training</code> / <code>VFlash</code> と掛け合わせた仮説 1、および <code>LEAD-RL</code> 型寄与度ゲート RLVR/GRPO と <code>RiSE-Drive</code> / <code>FP8 KV cache</code> を掛け合わせた仮説 2 を、<code>Jetson AGX Thor</code> 実機・<code>NAVSIM</code>・補正済 <code>Bench2Drive</code> 上の 1 週間反証実験として具体化した。</li>
+  <li><strong>全 7 本のハングル 0 件・Dashboard 配信確認</strong>：生成された <code>2026-11-14</code> の <code>01</code>–<code>07</code> Markdown / HTML 全ファイルに対する <code>[\uAC00-\uD7AF]</code> 検査で一致 0 件、<code>state.json</code> は全 7 件 <code>completed</code>（<code>error: null</code>）、Dashboard <code>/api/reports</code> への全件反映（旧統合 <code>04</code>/<code>05</code> 削除済み）を確認した。</li>
+</ul>
+
+<h2 id="diffs">7. Before / After 具体差分：プロンプト・出力・堅牢化</h2>
+
+<p>
+  プロンプトとランナーの改修がどのように出力の質を変えたかを、代表的な差分で確認します。まず、<code>03</code>（自動運転論文調査）は Phase 1 の素朴な 4 項目列挙から、Phase 3 では評価パラダイムの分離・監査・失敗モード・車載計算予算・Oracle 反証実験を強制する設計へと進化しました。
 </p>
 
 <pre class="mb-diff"><code class="nohighlight"><span class="ctx">--- a/daily_research/prompts/03-autonomous-driving-paper-trends.txt (Phase 1 vs Phase 3)</span>
@@ -1069,39 +1127,49 @@ pre.mb-diff .ctx::before { content: " "; }
 <span class="add">+        pass</span></code></pre>
 
 <p>
-  このプロンプト改修とランナー強化の結果、2026-11-14 の最終生成レポート（<code>01</code>–<code>05</code>）では、Phase 1 の出力とは質的に異なる情報密度と検証規律が達成されました。
+  このプロンプト改修とランナー強化の結果、Phase 4（v4 7本構成）の 2026-11-14 実出力（<code>01</code>–<code>07</code>）では、旧来の単一観点レポートから、確認規律・検索カバレッジ・異分野実験設計が構造的にかみ合う状態へ到達しました。
 </p>
 
 <table>
   <tr>
     <th class="mb-rowlabel">レポート</th>
-    <th>Phase 1 の課題（初期実行）</th>
-    <th>Phase 3 後の実出力（2026-11-14 最終版）</th>
+    <th>Phase 1 / 従来設計の課題</th>
+    <th>Phase 4 (v4) 後の実出力（2026-11-14 全 7 本構成）</th>
   </tr>
   <tr>
     <td class="mb-rowlabel"><code>01</code> 最新AI・Tips</td>
     <td>毎回同じ一般論比較表・推奨マトリクス、<code>llama.cpp</code> 等に偏重、確認深度が曖昧</td>
-    <td>全件 <code>[L2]</code> 確認済、<code>FDE 顧客導入・システム設計への示唆</code> と業務完了単価、未確認オプション創作の抑止（27 KB / 47.5 KB HTML）</td>
+    <td>全件 <code>[L2]</code> 確認済、<code>FDE 顧客導入・システム設計への示唆</code> と業務完了単価、未確認オプション創作の抑止（27.4 KB / 47.5 KB HTML）</td>
   </tr>
   <tr>
     <td class="mb-rowlabel"><code>02</code> 新興開発ツール</td>
     <td>週次表現と 5–10 件ノルマ、裏付けなき「今すぐ試す」や Jetson 推測</td>
-    <td><code>KittyBrowser</code>・<code>browser-use v1.0.4</code>・<code>OmniDiff v0.4.0</code> の 3 件に厳選、既存ボトルネック＋4 点セット試行手順を出力（18 KB / 37.3 KB HTML）</td>
+    <td><code>KittyBrowser</code>・<code>browser-use v1.0.4</code>・<code>OmniDiff v0.4.0</code> の 3 件に厳選、既存ボトルネック＋4 点セット試行手順を出力（18.1 KB / 37.3 KB HTML）</td>
   </tr>
   <tr>
     <td class="mb-rowlabel"><code>03</code> 自動運転論文</td>
     <td><code>.mb-summary</code> に論文メタデータ混入、成功点のみの羅列、<code>Liauto</code> 誤記</td>
-    <td><code>arXiv:2611.16727</code>・<code>RiSE-Drive</code>（EP 低下を明記）・<code>When2Go</code>（3 点のプロトコル改変を監査）・<code>JustRUA</code>（Embodied AI 転用）と Cross-Pollination 2 案を収録（41 KB / 64.1 KB HTML）</td>
+    <td><code>arXiv:2611.16727</code>・<code>RiSE-Drive</code>（EP 低下を明記）・<code>When2Go</code>（3 点のプロトコル改変を監査）・<code>JustRUA</code>（Embodied AI 転用）と Cross-Pollination 2 案を収録（41.9 KB / 64.1 KB HTML）</td>
   </tr>
   <tr>
-    <td class="mb-rowlabel"><code>04</code> Agent / Harness</td>
-    <td>番号リスト 1 行連結バグ、応用先が自身の CLI 運用のみ</td>
-    <td><code>Agency</code>・<code>WikiTrace</code>・<code>CAMP-II</code>・<code>ACE-RL</code> に対し <code>5a</code>（CLI ハーネス）と <code>5b</code>（FDE 認可境界・AD 閉ループ転用）を分離出力（33 KB / 52.9 KB HTML）</td>
+    <td class="mb-rowlabel"><code>04</code> Context / Harness</td>
+    <td>番号リスト連結バグ、Loop/Graph との枠競合、ハングル 1 語混入（旧 <code>04</code>）</td>
+    <td>Context/Harness/Eval 4 件（<code>Singularity-Bench</code>・<code>Verify by Doing</code>・<code>WikiTrace</code>・<code>MIGRO</code>）＋土曜拡張枠 <code>Memory Just a Clock</code> を収録、ハングル 0 件（31.0 KB / 51.8 KB HTML）</td>
   </tr>
   <tr>
-    <td class="mb-rowlabel"><code>05</code> 統合戦略（新設）</td>
-    <td>存在せず（FDE 求人・企業導入解剖・AD 最小実験設計が欠落）</td>
-    <td>3 社東京 FDE 求人と AAIF/ADK 動向、荏原製作所・空研工業の解剖、<code>VFlash</code>（Jetson Thor 3,552.7 ms から 703.3 ms）と <code>DA-WAM</code> の 1 週間最小実験、面接骨子・7 日実装計画を出力（44 KB / 69.2 KB HTML）</td>
+    <td class="mb-rowlabel"><code>05</code> FDE・企業本番導入</td>
+    <td>Phase 1–2 では不在、Phase 3 では AD 実験と混在</td>
+    <td>Google/OpenAI/Anthropic 求人比較（未確認項目明示）・<code>gpt-6-luna</code> 国内推論・<code>Agent Gateway for GKE</code>・<code>Claude for Manufacturing × Infor</code> / <code>空研工業</code> 解剖・面接設計問題を独立出力（40.8 KB / 62.8 KB HTML）</td>
+  </tr>
+  <tr>
+    <td class="mb-rowlabel"><code>06</code> AD 異分野転用実験</td>
+    <td>Phase 3 では FDE 求人と同居し仮説深掘りが窮屈</td>
+    <td>未解決ボトルネック 3 件（<code>RiSE-Drive</code>・<code>SparseWAM 164ms</code> / <code>Bench2Drive r=0.97</code>・自己回帰遅延）に対し、<code>03</code> + <code>07</code> 接続の仮説 2 件と <code>Jetson AGX Thor</code> 1 週間反証計画を出力（28.9 KB / 52.0 KB HTML）</td>
+  </tr>
+  <tr>
+    <td class="mb-rowlabel"><code>07</code> Loop / Graph 工学</td>
+    <td>新設前（<code>04</code> のタイトルアンカーと貪欲停止により探索から欠落）</td>
+    <td>2 段階探索で Loop 2 件（<code>Termination Lag</code>・<code>openai-agents-js v0.22.0</code>）＋ Graph 3 件（<code>LEAD-RL</code>・<code>ReTrace</code>・<code>LangGraph</code>）、8 領域 <code>探索カバレッジ</code>（空席 3 件明示）・<code>用語ウォッチ</code> を出力（30.9 KB / 53.2 KB HTML）</td>
   </tr>
 </table>
 
@@ -1115,18 +1183,18 @@ pre.mb-diff .ctx::before { content: " "; }
   <p class="mb-quote-source">Swarm Message #33 (2026-11-14 19:41:28 / external-rev による Codex gpt-6.1-sol レビュー要約より)</p>
 </blockquote>
 
-<h2 id="limits">7. 検証結果・残存課題と今後の運用</h2>
+<h2 id="limits">8. 検証結果・残存課題と今後の運用</h2>
 
 <p>
-  最終コミット（<code>a644925</code>）時点で、単体テスト 20 件（<code>python3 -m unittest discover -s daily_research/tests -v</code>）が 1.222 秒で全件 PASS し、<code>state.json</code> は <code>01</code> から <code>05</code> まで全件 <code>completed</code>（<code>error: null</code>）に揃いました。また、Dashboard の <code>/api/reports</code> 経由で全 5 本（および本レポート）が配信可能であることを確認しています。
+  Phase 4（v4 7本構成）時点で、単体テスト 24 件（<code>python3 -m unittest discover -s daily_research/tests -v</code>）が全件 PASS し、<code>state.json</code> は <code>01</code> から <code>07</code> まで全 7 件 <code>completed</code>（<code>error: null</code>）に揃いました。また、Dashboard の <code>/api/reports</code> 経由で全 7 本（および本レポート）が配信可能であることを確認しています。
 </p>
 
 <h3>観測された残存課題と次のアクション</h3>
 
 <ul>
   <li><strong><code>read_url</code> ツールの不在</strong>：現在も <code>agy --mode plan</code> には <code>read_url</code> が提供されていないため、多段階 <code>search_web</code> クエリで代替しています。arXiv HTML 全文や企業テックブログ本文を直接読める環境が整備されれば、<code>[L2]</code> のさらに深い検証（<code>[L3]</code> 相当）が可能になります。</li>
-  <li><strong>外国語トークンの極小残存</strong>：Phase 3 出力のハングル検査では <code>01</code>・<code>02</code>・<code>03</code>・<code>05</code> が 0 件だった一方、<code>04</code> の 95 行目に 1 語のみ（<code>長시간</code>）の混入が確認されています。必要に応じて HTML レンダラ側または事後検証での自動検知警告を検討する余地があります。</li>
-  <li><strong>毎朝 05:00 JST の運用監視</strong>：<code>daily-gemini-research.timer</code> は有効化されており、次回以降の日次実行では過去 7 日分の既出 URL / arXiv ID 注入による重複排除が実運用で機能し始めます。出力時間が 5 本合計で約 30 分規模に伸びたため、<code>TimeoutStartSec=130min</code> の範囲内で推移するかを数日観測するのが適切です。</li>
+  <li><strong>Argon クォータ枯渇とフォールバック運用</strong>：Phase 4 の本番実行で <code>agy</code> 既定モデル（Argon）が <code>RESOURCE_EXHAUSTED (429)</code> に達したため、ランナーへ <code>--model</code> オプションと 429 検知時の <code>gemini-4-hydrogen-high</code> 自動フォールバックを組み込みました。<code>daily-gemini-research.timer</code> による毎朝実行では、既定枠が枯渇していても自動完走するかを引き続き監視します。</li>
+  <li><strong>ハングルサニタイズと毎朝 05:00 JST の実行順序</strong>：<code>sanitize_hangul()</code> による自動除去・記録を導入し、今回の全 7 本出力では <code>[\uAC00-\uD7AF]</code> 一致 0 件を確認しました。また 7 本化に伴い <code>04</code>・<code>07</code>・<code>06</code> の順の当日参照連携が有効に働くため、次回以降の定期実行では <code>01</code>〜<code>05</code>, <code>07</code>, <code>06</code> の順次完走と <code>TimeoutStartSec=130min</code> 内の所要時間推移を数日観測します。</li>
 </ul>
 
 </main><!-- /.mb-main -->
@@ -1135,11 +1203,15 @@ pre.mb-diff .ctx::before { content: " "; }
   <h2 id="glossary-title">用語リスト</h2>
   <dl>
     <dt>agy (Antigravity CLI)</dt>
-    <dd>ローカルで自律エージェントを実行する CLI。本基盤では隔離 HOME と strict 権限で Web 検索のみを許可する。</dd>
+    <dd>ローカルで自律エージェントを実行する CLI。本基盤では隔離 HOME と strict 権限で Web 検索のみを許可する。429 時は Hydrogen へ自動切替する。</dd>
     <dt>FDE (Forward Deployed Engineer)</dt>
     <dd>顧客先へ深く入り込み、AI 基盤の本番統合・Eval 設計・ガバナンス構築までをやり切るエンジニア職。</dd>
     <dt>L1 / L2 確認レベル</dt>
     <dd>L1 は検索スニペットのみ・未確認、L2 は公式リリース・アブストラクト・仕様を確認済みの情報区分。</dd>
+    <dt>探索カバレッジ（07）</dt>
+    <dd>Loop 4 領域・Graph 4 領域の計 8 サブ領域それぞれの探索結果と、該当 L2 なし（空席）を隠さず記録する監査表。</dd>
+    <dt>Termination Lag</dt>
+    <dd>エージェントが正解へ到達した後も冗長な探索・推論ステップを続け、遅延増大や正解破壊を招く現象（arXiv:2611.14960）。</dd>
     <dt>Oracle Selector</dt>
     <dd>固定された候補軌道集合の中で真の評価スコアが最大の候補を選ぶ理論上限。生成器と選択器のどちらがボトルネックかを切り分ける。</dd>
     <dt>CSP sandbox</dt>

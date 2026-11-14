@@ -1,0 +1,90 @@
+# Agent 制御構造（Loop / Graph Engineering）論文・OSS 設計動向調査
+
+【目的】
+LLM / マルチモーダル Agent における**反復・探索・停止の制御（Loop）**および**トポロジ・状態遷移・知識構造（Graph）**に関する最新論文・公式技術レポート・主要 OSS フレームワークの制御モデル変更を調査してください。
+Context & Memory やサンドボックス実行環境そのものを主軸とする研究はテーマ `04` の担当であるため本レポートでは採用せず、**「Agent がどう回り、どう分岐・協調・停止し、どう構造化知識を辿るか」**という制御構造のブレイクスルーを漏れなく捕捉してください。
+
+【対象範囲とテーマ境界】
+- **対象論文・プレプリント**: `arXiv`（`cs.AI`, `cs.CL`, `cs.MA`, `cs.IR`, `cs.SE`, `cs.LG`）、Hugging Face Papers / alphaxiv、NeurIPS / ICLR / ICML / ACL / EMNLP 等。
+- **対象公式ブログ・主要 OSS フレームワークの制御モデル変更（リリースノート / 設計ドキュメント / CHANGELOG）**:
+  - `LangGraph`, `GraphRAG` (Microsoft), `LightRAG`, `Graphiti`, `AutoGen / AG2`, `Microsoft Agent Framework`, `OpenAI Agents SDK`, `Google ADK`, `CrewAI Flows`, `LlamaIndex Workflows`, `Pydantic AI`, `DSPy`, `Temporal` 等。
+- **他テーマとの境界**:
+  - 単体 CLI / 開発ツールの紹介やセットアップ手順は `02` の担当。状態グラフの意味論・チェックポイント・`interrupt` / durable execution・並列実行モデル・トポロジ制御の設計変更を `07` で扱う。
+  - コンテキストの中身・記憶表現やサンドボックス隔離自体が主軸のものは `04` の担当（`04` 当日・直近7日間の既出 ID/URL は重複排除リストで除外）。
+
+【探索手順（2段階探索・順序厳守）】
+**必ず Phase A（発見）を全8サブ領域で完了してから Phase B（深掘り）に進んでください。**
+発見クエリには `"loop engineering"` / `"graph engineering"` というバズワードを使わず、実論文・実OSSで使われる以下の語彙と鮮度トークン（`{{FRESHNESS_HINT}}`）を組み合わせて `search_web` で検索してください（`site:` 演算子がヒットしない場合は演算子を外して再検索すること）。
+
+- **Phase A（発見: Loop 4サブ領域 × 計6クエリ以上、Graph 4サブ領域 × 計6クエリ以上）**:
+  - **Loop サブ領域**:
+    - `L1` 推論時探索: `test-time scaling`, `test-time compute`, `inference-time search`, `MCTS / tree search + LLM agent`, `adaptive thinking budget`
+    - `L2` 自己修復・検証ループ: `self-refinement`, `self-correction`, `generate-verify-revise`, `verifier / critic loop`, `evaluator-optimizer`, `failure recovery`, `rollback / checkpoint`
+    - `L3` 収束・停止・予算制御: `early stopping / termination criteria`, `"when to stop"`, `budget-aware / cost-aware agent`, `loop detection`, `stuck agent`, `diminishing returns of iteration`
+    - `L4` 長時間自律・HITL: `long-running agents`, `long-horizon autonomy`, `outer loop / inner loop`, `autonomous research loop`, `human-in-the-loop interrupt / approval`
+  - **Graph サブ領域**:
+    - `G1` マルチエージェント・トポロジ: `multi-agent topology`, `communication graph`, `topology optimization`, `agent pruning`, `orchestrator-worker`, `handoff`
+    - `G2` ワークフロー生成・DAG: `agentic workflow generation / optimization`, `automated design of agentic systems`, `task graph`, `DAG planning`, `parallel tool-call scheduling`
+    - `G3` 状態遷移・耐久実行: `state machine / statechart agent`, `durable execution`, `checkpointing`, `stateful graph`, `workflow engine`
+    - `G4` 知識構造・グラフ記憶: `GraphRAG`, `knowledge graph RAG`, `graph memory`, `temporal knowledge graph`, `code graph / repository graph`, `KG-augmented agent`
+  - **本日の重点注入語彙（日替わりローテーション）**:
+{{DAILY_CONTROL_LEXICON}}
+- **Phase B（深掘り）**:
+  - Phase A で採用候補に絞った項目のみ、`search_web` で `論文ID / OSS名 + ablation / limitation / benchmark / release notes / github` を追加検索して詳細・制約を掘削してください。
+- **用語ウォッチ（別枠・各1回のみ）**:
+  - 発見クエリとは別に、`"loop engineering"` と `"graph engineering"` を各1回だけ検索し、主枠には採用せず `## 用語ウォッチ` で「誰がどの意味で使い始めているか」を1〜2行で報告してください（ヒットなしなら「新出の動き未確認」と記載）。
+
+【採用枠・予約枠・主軸一意決定規則】
+- **採用枠**: **最大3〜5件**（原則4件、該当が少ない日は **0〜3件・0件も正常結果として許容**）。
+- **最低予約枠**: うち **Loop 1枠・Graph 1枠を最低予約枠** とします。`[L2: 公式リリース・アブストラクト・仕様確認済]` を満たす候補が存在しない柱は「**空席（該当 L2 なし）**」のままにして他柱で埋めないでください（空席の柱には「次点（`[L1]`・未確認）」を1行だけ付記可）。
+- **主軸一意決定規則（「操作している変数」で1つに決定し、副タグは別欄へ）**:
+  - 操作している主変数が「反復・停止・探索・検証の制御」→ **主軸: `Loop`**
+  - 操作している主変数が「トポロジ・状態遷移・ワークフロー構造・知識グラフ構造」→ **主軸: `Graph`**
+
+【出力フォーマット（必須構造）】
+1行目は必ず `# Agent 制御構造（Loop / Graph Engineering）論文・OSS 設計動向調査` とし、以下の構成で出力してください。
+
+```markdown
+# Agent 制御構造（Loop / Graph Engineering）論文・OSS 設計動向調査
+
+## 要点サマリー (TL;DR)
+- 本日の Loop / Graph 制御構造の最新トレンド、8サブ領域の探索状況（空席有無含む）、CLI運用・FDE/AD転用への結論を3〜5行の箇条書きで簡潔に記載
+
+## 探索カバレッジ
+| サブ領域 | 実行クエリ（原文） | ヒット候補数 | 採用件数 | 空席・不採用理由 |
+| --- | --- | --- | --- | --- |
+| L1 推論時探索 | ... | ... | ... | ... |
+| L2 自己修復・検証ループ | ... | ... | ... | ... |
+| L3 収束・停止・予算制御 | ... | ... | ... | ... |
+| L4 長時間自律・HITL | ... | ... | ... | ... |
+| G1 マルチエージェント・トポロジ | ... | ... | ... | ... |
+| G2 ワークフロー生成・DAG | ... | ... | ... | ... |
+| G3 状態遷移・耐久実行 | ... | ... | ... | ... |
+| G4 知識構造・グラフ記憶 | ... | ... | ... | ... |
+
+## ピックアップ（Loop / Graph Engineering）
+### 1. <タイトル / OSSリリース名>（区分: 新規公開 / 【遅延発見】 / 【続報】 | 主軸: Loop / Graph | サブ領域: L1..G4 | 副タグ: ... | 確認レベル: [L2: ...] or [L1: ...]）
+- **発表日・資料種別**: YYYY-MM-DD | 査読論文 / プレプリント / 公式技術レポート / OSS リリース・設計ドキュメント
+- **著者・組織 / リポジトリ**: ...
+- **URL / arXiv ID**: ...（コード・リリース公開: あり(URL) / なし / 未確認）
+- **解決する課題と制御機構**: ...
+- **評価条件と定量的効果・限界**: ...（OSS リリース等の場合は破壊的変更・互換性・ベンチマーク有無と限界を記載。未確認は「未確認」）
+- **5a. マルチエージェント / CLIハーネス運用（Claude Code / Codex / Antigravity）への応用**:
+  - **実証事実**: ...
+  - **設計考察**: ...
+- **5b. FDE 顧客業務・または AD パイプラインへの転用（どちらか一方・3〜5行以内）**:
+  - **対象・壊れる前提・転用設計**: ...
+
+## 用語ウォッチ（"loop engineering" / "graph engineering"）
+- `"loop engineering"`: ...
+- `"graph engineering"`: ...
+
+## 参照ソース一覧
+| # | 論文・OSS・レポート名 | URL | 公開/更新日 | 確認に使った検索クエリ | 一次/二次区分・確認レベル（L1/L2） |
+| --- | --- | --- | --- | --- | --- |
+```
+
+【制約・品質基準】
+- `[L2: 公式リリース・アブストラクト・仕様確認済]` で確認できた事実と、`[L1: 検索断片のみ・詳細未確認]`・推測を厳格に区別し、確認できない項目は「未確認」と明記してください。`L1` に留まる情報のみに基づく強い導入推奨や一般化は禁止します。
+- 検索していないサブ領域を「該当なし」と偽ることを厳禁とします。`## 探索カバレッジ` に実際に実行した検索クエリ原文と結果を正直に記録してください。
+- 数式や矢印に LaTeX 記法（`$\rightarrow$` 等）を使わず、プレーンな Unicode 文字（`→`, `×`, `≥`, `≤` 等）を使用してください。

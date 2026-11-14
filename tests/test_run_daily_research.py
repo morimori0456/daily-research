@@ -28,8 +28,10 @@ class PromptDiscoveryTests(unittest.TestCase):
                 "01-latest-ai-cloud-and-local-llm-cases-tips",
                 "02-emerging-dev-tools-trending",
                 "03-autonomous-driving-paper-trends",
-                "04-llm-agent-context-harness-engineering-papers",
-                "05-fde-career-and-av-breakthrough-synthesis",
+                "04-context-harness-engineering",
+                "05-fde-career-and-enterprise-deployment",
+                "06-av-breakthrough-and-cross-domain-experiments",
+                "07-agent-control-loop-and-graph-engineering",
             ],
         )
         for p in prompts:
@@ -47,8 +49,8 @@ class PromptDiscoveryTests(unittest.TestCase):
             ["03"],
         )
         self.assertEqual(
-            [p.prompt_id for p in rdr.filter_prompts(prompts, only="01,04,05")],
-            ["01", "04", "05"],
+            [p.prompt_id for p in rdr.filter_prompts(prompts, only="04,05,06,07")],
+            ["04", "05", "06", "07"],
         )
         self.assertEqual(
             [p.prompt_id for p in rdr.filter_prompts(prompts, limit=2)],
@@ -253,7 +255,7 @@ VLAモデルの車載最適化が進んでいます。World Modelの推論時制
 class PromptContentValidationTests(unittest.TestCase):
     def test_updated_prompts_format_and_constraints(self) -> None:
         prompts = rdr.discover_prompts(DAILY_RESEARCH_DIR / "prompts")
-        self.assertEqual(len(prompts), 5)
+        self.assertEqual(len(prompts), 7)
         by_id = {p.prompt_id: p for p in prompts}
 
         for p in prompts:
@@ -303,27 +305,90 @@ class PromptContentValidationTests(unittest.TestCase):
         self.assertIn("On-vehicle Compute Budget", by_id["03"].text)
         self.assertIn("Falsifiable Hypothesis", by_id["03"].text)
 
-        for idx in range(1, 6):
-            self.assertRegex(by_id["04"].text, rf"(?m)^{idx}\.\s+\*\*")
-        self.assertIn("バズワード", by_id["04"].text)
-        self.assertIn("5a.", by_id["04"].text)
-        self.assertIn("5b.", by_id["04"].text)
+        self.assertEqual(
+            by_id["04"].text.splitlines()[0],
+            "# Agent Context & Harness Engineering 論文・技術レポート調査",
+        )
+        for marker in (
+            "Context & Memory Engineering",
+            "Harness & Execution Engineering",
+            "{{DAILY_ROTATION_SLOT}}",
+            "拡張枠（曜日ローテーション対象・最大1件）",
+            "07`: Agent 制御構造",
+            "確認に使った検索クエリ",
+            "5a.",
+            "5b.",
+        ):
+            self.assertIn(marker, by_id["04"].text)
 
         self.assertEqual(
             by_id["05"].text.splitlines()[0],
-            "# FDE キャリア・エンタープライズ導入 & 自動運転ブレイクスルー戦略リサーチ",
+            "# FDE キャリア・エンタープライズ AI 本番導入インテリジェンス",
         )
         for marker in (
             "## 1. Google / OpenAI / Anthropic FDE 求人・選考・プラットフォーム最新動向",
             "## 2. エンタープライズ本番導入ケーススタディ解剖（製造・自動車・物理AI・基幹業務優先）",
-            "## 3. 自動運転「未解決ボトルネック × 異分野転用」ブレイクスルー実験仮説",
-            "## 4. 今週の FDE 面接ケーススタディ & ポートフォリオ・アクション",
-            "Oracle",
-            "NAVSIM",
-            "Jetson AGX Thor",
+            "## 3. FDE System Design 面接ケーススタディ & ポートフォリオギャップ分析",
+            "Vertex AI ADK",
+            "OpenAI Agents SDK",
+            "Anthropic MCP",
+            "AAIF",
+            "成功した業務1件あたりの総コスト",
             "System Design",
+            "Jetson AGX Thor",
+            "0件も正常結果として許容",
+            "年収・報酬レンジ・待遇・採用ハードル",
+            "確認に使った検索クエリ",
         ):
             self.assertIn(marker, by_id["05"].text)
+        self.assertNotIn("## 3. 自動運転", by_id["05"].text)
+
+        self.assertEqual(
+            by_id["06"].text.splitlines()[0],
+            "# 自動運転 未解決ボトルネック台帳 & 異分野転用ブレイクスルー実験設計",
+        )
+        for marker in (
+            "## 1. 自動運転の未解決ボトルネック・実運用失敗・評価基盤の急所",
+            "## 2. 異分野転用（Cross-Pollination）ブレイクスルー実験仮説",
+            "## 3. 1週間以内の最小反証実験プラン（Jetson AGX Thor / 公開評価基盤）",
+            "直近7日間の `03`（自動運転論文）および `07`（Loop / Graph 制御構造）",
+            "直近7日間の既出ボトルネック・実験仮説（重複排除用）",
+            "NAVSIM",
+            "Bench2Drive",
+            "HUGSIM",
+            "FP8 KV cache",
+            "Flash Primitive Decoding",
+            "Paged Experts",
+            "Oracle",
+            "Generator",
+            "Selector",
+            "P99 ≤ 100ms",
+        ):
+            self.assertIn(marker, by_id["06"].text)
+
+        self.assertEqual(
+            by_id["07"].text.splitlines()[0],
+            "# Agent 制御構造（Loop / Graph Engineering）論文・OSS 設計動向調査",
+        )
+        for marker in (
+            "cs.MA",
+            "cs.IR",
+            "LangGraph",
+            "GraphRAG",
+            "LightRAG",
+            "Graphiti",
+            "Google ADK",
+            "Temporal",
+            "{{DAILY_CONTROL_LEXICON}}",
+            "{{FRESHNESS_HINT}}",
+            "## 探索カバレッジ",
+            "## ピックアップ（Loop / Graph Engineering）",
+            '## 用語ウォッチ（"loop engineering" / "graph engineering"）',
+            "Loop 1枠・Graph 1枠を最低予約枠",
+            "主軸一意決定規則",
+            "確認に使った検索クエリ",
+        ):
+            self.assertIn(marker, by_id["07"].text)
 
 
 class DeduplicationAndPromptWrapperTests(unittest.TestCase):
@@ -407,6 +472,114 @@ class DeduplicationAndPromptWrapperTests(unittest.TestCase):
         self.assertIn("- arXiv:2611.16727", wrapped)
         self.assertIn("- https://example.com/old", wrapped)
         self.assertTrue(wrapped.endswith("本文プロンプト"))
+
+    def test_prepare_prompt_text_rotation_04_and_lexicon_07(self) -> None:
+        prompts = {p.prompt_id: p for p in rdr.discover_prompts(DAILY_RESEARCH_DIR / "prompts")}
+
+        # Monday (2026-11-16) -> Agentic Post-Training & Distillation
+        mon = rdr.prepare_prompt_text(prompts["04"], "2026-11-16")
+        self.assertNotIn("{{DAILY_ROTATION_SLOT}}", mon)
+        self.assertIn("Agentic Post-Training & Distillation", mon)
+
+        # Tuesday (2026-11-17) -> Evaluation, Reliability & Security Engineering
+        tue = rdr.prepare_prompt_text(prompts["04"], "2026-11-17")
+        self.assertIn("Evaluation, Reliability & Security Engineering", tue)
+
+        # Wednesday (2026-11-18) -> Multimodal & World-Grounded Agents
+        wed = rdr.prepare_prompt_text(prompts["04"], "2026-11-18")
+        self.assertIn("Multimodal & World-Grounded Agents", wed)
+
+        # Sunday (2026-11-15) -> 拡張枠なし
+        sun = rdr.prepare_prompt_text(prompts["04"], "2026-11-15")
+        self.assertIn("拡張枠なし", sun)
+
+        # 07 lexicon rotation differs across days and removes placeholders
+        d1 = rdr.prepare_prompt_text(prompts["07"], "2026-11-14")
+        d2 = rdr.prepare_prompt_text(prompts["07"], "2026-11-15")
+        self.assertNotIn("{{DAILY_CONTROL_LEXICON}}", d1)
+        self.assertNotIn("{{FRESHNESS_HINT}}", d1)
+        self.assertIn("arXiv 2611 / November 2026", d1)
+        self.assertNotEqual(d1, d2)
+
+    def test_cross_prompt_dedup_04_to_07_and_synthesis_injection_06(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = Path(tmp) / "output"
+            # Past day 04 (legacy slug) and today 04 (new slug)
+            d_prev = output_root / "2026-11-12"
+            d_prev.mkdir(parents=True)
+            (d_prev / "20261112-04-llm-agent-context-harness-engineering-papers.md").write_text(
+                "### 1. Past04\n- arXiv:2611.11111 https://arxiv.org/abs/2611.11111\n",
+                encoding="utf-8",
+            )
+            d_today = output_root / "2026-11-14"
+            d_today.mkdir(parents=True)
+            (d_today / "20261114-04-context-harness-engineering.md").write_text(
+                "### 1. Today04\n- arXiv:2611.22222 https://arxiv.org/abs/2611.22222\n",
+                encoding="utf-8",
+            )
+            (d_today / "20261114-03-autonomous-driving-paper-trends.md").write_text(
+                "### 1. VFlash VLA (区分: 新規公開)\n- URL: https://arxiv.org/abs/2611.08449\n",
+                encoding="utf-8",
+            )
+            (d_prev / "20261112-07-agent-control-loop-and-graph-engineering.md").write_text(
+                "### 1. TopologyOpt Graph (主軸: Graph)\n- URL: https://arxiv.org/abs/2611.33333\n",
+                encoding="utf-8",
+            )
+            (d_prev / "20261112-06-av-breakthrough-and-cross-domain-experiments.md").write_text(
+                "### ボトルネック1: OldBottleneck\n### 仮説1: OldBottleneck × OldMethod\n- **対象ボトルネック**: OldBottleneck\n- **掛け合わせる異分野技術**: OldMethod\n",
+                encoding="utf-8",
+            )
+
+            prompts = {p.prompt_id: p for p in rdr.discover_prompts(DAILY_RESEARCH_DIR / "prompts")}
+            refs_07 = rdr.collect_prompt_dedup_refs(output_root, prompts["07"], "2026-11-14")
+            self.assertIn("arXiv:2611.11111", refs_07)
+            self.assertIn("arXiv:2611.22222", refs_07)
+
+            cross_06 = rdr.collect_cross_domain_items_for_06(output_root, "2026-11-14")
+            self.assertTrue(any("VFlash VLA" in item and "arXiv:2611.08449" in item for item in cross_06))
+            self.assertTrue(any("TopologyOpt Graph" in item and "arXiv:2611.33333" in item for item in cross_06))
+
+            hyp_06 = rdr.collect_recent_06_hypotheses(output_root, prompts["06"].slug, "2026-11-14")
+            self.assertTrue(any("OldBottleneck × OldMethod" in h for h in hyp_06))
+
+            wrapped_06 = rdr.build_research_prompt(
+                "本文06",
+                "2026-11-14",
+                cross_domain_items=cross_06,
+                recent_hypotheses=hyp_06,
+            )
+            self.assertIn("03`（自動運転論文）および `07`（Loop/Graph 制御）採択項目", wrapped_06)
+            self.assertIn("既出ボトルネック・実験仮説", wrapped_06)
+            self.assertTrue(wrapped_06.endswith("本文06"))
+
+    def test_sanitize_hangul_removes_tokens_and_logs_warning(self) -> None:
+        cleaned, hits = rdr.sanitize_hangul("正常文 장시간 テスト 멀티エージェント 終わり")
+        self.assertEqual(hits, ["장시간", "멀티"])
+        self.assertNotRegex(cleaned, r"[\uAC00-\uD7AF]")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir = root / "prompts"
+            output_root = root / "output"
+            dash_dir = root / "dash"
+            prompts_dir.mkdir(parents=True)
+            (prompts_dir / "01-alpha.txt").write_text("# Alpha\n詳細調査", encoding="utf-8")
+
+            stderr_buf = io.StringIO()
+            with contextlib.redirect_stderr(stderr_buf):
+                rc = rdr.run_daily(
+                    prompts_dir=prompts_dir,
+                    output_root=output_root,
+                    dashboard_reports_dir=dash_dir,
+                    run_date="2026-11-14",
+                    runner=lambda _t, _d, _to: "# テスト\n\n## 要点サマリー (TL;DR)\n- 長시간テスト\n",
+                )
+            self.assertEqual(rc, 0)
+            self.assertIn("stripped 1 Hangul token", stderr_buf.getvalue())
+            md_text = (output_root / "2026-11-14" / "20261114-01-alpha.md").read_text(encoding="utf-8")
+            html_text = (dash_dir / "20261114-01-alpha.html").read_text(encoding="utf-8")
+            self.assertNotRegex(md_text, r"[\uAC00-\uD7AF]")
+            self.assertNotRegex(html_text, r"[\uAC00-\uD7AF]")
 
 
 class IsolatedAgyRunnerTests(unittest.TestCase):
@@ -510,6 +683,42 @@ print(json.dumps({{"status": "SUCCESS", "response": "## 調査結果\\n\\n- テ�
             self.assertTrue(record["token_exists"])
             self.assertIn("--sandbox", record["argv"])
             self.assertIn("plan", record["argv"])
+
+    def test_run_agy_prompt_falls_back_on_resource_exhausted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cli_dir = self._create_fake_cli_dir(root)
+            calls_file = root / "calls.jsonl"
+            fake_agy = root / "agy"
+            fake_agy.write_text(
+                f"""#!/usr/bin/env python3
+import json, sys
+with open({str(calls_file)!r}, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps(sys.argv[1:]) + "\\n")
+if "--model" in sys.argv and sys.argv[sys.argv.index("--model") + 1] == "gemini-4-hydrogen-high":
+    print(json.dumps({{"status": "SUCCESS", "response": "# Fallback OK\\n\\n## 要点サマリー (TL;DR)\\n- ok"}}))
+    sys.exit(0)
+sys.stderr.write('AGY_ERROR: {{"status":"RESOURCE_EXHAUSTED","short_error":"RESOURCE_EXHAUSTED (code 429)"}}\\n')
+sys.exit(3)
+""",
+                encoding="utf-8",
+            )
+            fake_agy.chmod(0o755)
+            stderr_buf = io.StringIO()
+            with contextlib.redirect_stderr(stderr_buf):
+                out = rdr.run_agy_prompt(
+                    "test",
+                    run_date="2026-11-14",
+                    timeout_sec=10,
+                    agy_bin=str(fake_agy),
+                    source_cli_dir=cli_dir,
+                )
+            self.assertIn("Fallback OK", out)
+            self.assertIn("falling back to gemini-4-hydrogen-high", stderr_buf.getvalue())
+            calls = [json.loads(line) for line in calls_file.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(calls), 2)
+            self.assertNotIn("--model", calls[0])
+            self.assertIn("gemini-4-hydrogen-high", calls[1])
 
     def test_run_agy_prompt_rejects_denied_actions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

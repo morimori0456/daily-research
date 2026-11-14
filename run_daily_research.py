@@ -30,6 +30,7 @@ DEFAULT_PROMPTS_DIR = BASE_DIR / "prompts"
 DEFAULT_OUTPUT_ROOT = BASE_DIR / "output"
 DEFAULT_CSS_PATH = BASE_DIR / "document.css"
 DEFAULT_TIMEOUT_SEC = 1800
+DEFAULT_FALLBACK_MODEL = "gemini-4-hydrogen-high"
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 DENIED_ACTIONS = [
@@ -77,6 +78,63 @@ SUMMARY_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 INLINE_LATEX_DOLLAR_RE = re.compile(r"\$([^$\n]{1,80})\$")
+HANGUL_RE = re.compile(r"[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]+")
+LEGACY_PROMPT_SLUGS: dict[str, tuple[str, ...]] = {
+    "04-context-harness-engineering": ("04-llm-agent-context-harness-engineering-papers",),
+    "06-av-breakthrough-and-cross-domain-experiments": ("05-fde-career-and-av-breakthrough-synthesis",),
+}
+WEEKDAY_NAMES_JA = ("月", "火", "水", "木", "金", "土", "日")
+ROTATION_SLOTS: dict[int, tuple[str, str]] = {
+    0: (
+        "Agentic Post-Training & Distillation",
+        "検証可能報酬による強化学習（RLVR / GRPO 等）、Process Reward Model (PRM) / 事後 Judge、環境相互作用からの自己改善、大型 Teacher モデルから小型 Edge モデルへの推論・行動軌跡蒸留",
+    ),
+    1: (
+        "Evaluation, Reliability & Security Engineering",
+        "本番業務 Eval ハーネス設計、評価環境の Reward Hacking 防御、間接プロンプトインジェクション防御、認可伝播（OAuth/RBAC）・監査ログ・決定論的ガードレール",
+    ),
+    2: (
+        "Multimodal & World-Grounded Agents",
+        "図面・帳票・GUI 操作（Computer Use / Browser Agent）、視覚・3D・物理空間の実行可能な状態へのグラウンディング、VLA（Vision-Language-Action）との接続",
+    ),
+    3: (
+        "Agentic Post-Training & Distillation",
+        "検証可能報酬による強化学習（RLVR / GRPO 等）、Process Reward Model (PRM) / 事後 Judge、環境相互作用からの自己改善、大型 Teacher モデルから小型 Edge モデルへの推論・行動軌跡蒸留",
+    ),
+    4: (
+        "Evaluation, Reliability & Security Engineering",
+        "本番業務 Eval ハーネス設計、評価環境の Reward Hacking 防御、間接プロンプトインジェクション防御、認可伝播（OAuth/RBAC）・監査ログ・決定論的ガードレール",
+    ),
+    5: (
+        "Multimodal & World-Grounded Agents",
+        "図面・帳票・GUI 操作（Computer Use / Browser Agent）、視覚・3D・物理空間の実行可能な状態へのグラウンディング、VLA（Vision-Language-Action）との接続",
+    ),
+}
+CONTROL_LEXICON_BY_SUBAREA: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("L1 推論時探索", ("test-time scaling agent", "test-time compute", "MCTS LLM agent", "tree search agent", "adaptive thinking budget")),
+    ("L2 自己修復・検証ループ", ("self-refinement agent", "generate-verify-revise", "verifier critic loop", "evaluator-optimizer", "failure recovery rollback")),
+    ("L3 収束・停止・予算制御", ("early stopping LLM agent", "termination criteria agent", "budget-aware agent", "loop detection stuck agent", "diminishing returns iteration")),
+    ("L4 長時間自律・HITL", ("long-running agents", "long-horizon autonomy", "outer loop inner loop agent", "autonomous research loop", "human-in-the-loop interrupt approval")),
+    ("G1 マルチエージェント・トポロジ", ("multi-agent topology", "communication graph agent", "topology optimization multi-agent", "agent pruning", "orchestrator-worker handoff")),
+    ("G2 ワークフロー生成・DAG", ("agentic workflow generation", "automated design of agentic systems", "task graph LLM", "DAG planning agent", "parallel tool-call scheduling")),
+    ("G3 状態遷移・耐久実行", ("state machine statechart agent", "durable execution agent", "agent checkpointing", "stateful graph workflow", "workflow engine agent")),
+    ("G4 知識構造・グラフ記憶", ("GraphRAG", "knowledge graph RAG", "graph memory agent", "temporal knowledge graph agent", "code graph repository graph")),
+)
+OSS_CONTROL_FRAMEWORKS: tuple[str, ...] = (
+    "LangGraph",
+    "Microsoft GraphRAG",
+    "LightRAG",
+    "Graphiti",
+    "AutoGen AG2",
+    "Microsoft Agent Framework",
+    "OpenAI Agents SDK",
+    "Google ADK",
+    "CrewAI Flows",
+    "LlamaIndex Workflows",
+    "Pydantic AI",
+    "DSPy",
+    "Temporal",
+)
 LATEX_SYMBOL_MAP = (
     (r"\\Leftrightarrow\b", "⇔"),
     (r"\\Rightarrow\b", "⇒"),
@@ -291,6 +349,36 @@ def _split_url_trailing_punct(raw_url: str) -> tuple[str, str]:
     return url, trailing
 
 
+def _extract_refs_from_markdown_file(
+    md_path: Path,
+    seen: set[str],
+    refs: list[str],
+    max_refs: int,
+) -> bool:
+    """Extract arXiv IDs and safe HTTP(S) URLs from one markdown file into `refs`. Returns True if cap hit."""
+    try:
+        content = md_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+    for match in ARXIV_REF_RE.finditer(content):
+        arxiv_ref = f"arXiv:{match.group(1)}"
+        if arxiv_ref not in seen:
+            seen.add(arxiv_ref)
+            refs.append(arxiv_ref)
+            if len(refs) >= max_refs:
+                return True
+
+    for match in EXTRACTED_URL_RE.finditer(content):
+        cleaned_url, _ = _split_url_trailing_punct(match.group(1))
+        if is_safe_http_url(cleaned_url) and cleaned_url not in seen:
+            seen.add(cleaned_url)
+            refs.append(cleaned_url)
+            if len(refs) >= max_refs:
+                return True
+    return False
+
+
 def collect_recent_reported_refs(
     output_root: Path,
     slug: str,
@@ -304,13 +392,6 @@ def collect_recent_reported_refs(
     target_date = dt.date.fromisoformat(run_date)
     seen: set[str] = set()
     refs: list[str] = []
-
-    def add_ref(item: str) -> bool:
-        if item in seen:
-            return False
-        seen.add(item)
-        refs.append(item)
-        return len(refs) >= max_refs
 
     for offset in range(1, days + 1):
         past_date = target_date - dt.timedelta(days=offset)
@@ -331,29 +412,215 @@ def collect_recent_reported_refs(
                     candidate_files.append(path)
 
         for md_path in candidate_files:
-            try:
-                content = md_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-
-            for match in ARXIV_REF_RE.finditer(content):
-                arxiv_ref = f"arXiv:{match.group(1)}"
-                if add_ref(arxiv_ref):
-                    return refs
-
-            for match in EXTRACTED_URL_RE.finditer(content):
-                cleaned_url, _ = _split_url_trailing_punct(match.group(1))
-                if is_safe_http_url(cleaned_url):
-                    if add_ref(cleaned_url):
-                        return refs
+            if _extract_refs_from_markdown_file(md_path, seen, refs, max_refs):
+                return refs
 
     return refs
+
+
+def sanitize_hangul(text: str) -> tuple[str, list[str]]:
+    """Detect and strip unintended Hangul tokens from generated Markdown text."""
+    hits = HANGUL_RE.findall(text)
+    if not hits:
+        return text, []
+    return HANGUL_RE.sub("", text), hits
+
+
+def build_04_rotation_section(run_date: str) -> str:
+    """Return the deterministic weekday-rotation slot instruction for prompt 04."""
+    day = dt.date.fromisoformat(run_date)
+    weekday = day.weekday()
+    weekday_ja = WEEKDAY_NAMES_JA[weekday]
+    slot = ROTATION_SLOTS.get(weekday)
+    if slot is None:
+        return (
+            f"- **本日の曜日（{run_date}・{weekday_ja}曜 JST）: 拡張枠なし**\n"
+            "  - 本日は Context & Memory と Harness & Execution の本枠のみに集中し、拡張枠セクションは「本日は拡張枠なし」と1行のみ記載してください。"
+        )
+    domain_name, focus_desc = slot
+    return (
+        f"- **本日の曜日（{run_date}・{weekday_ja}曜 JST）の拡張枠指定: `{domain_name}`（最大1件）**\n"
+        f"  - 対象トピック: {focus_desc}\n"
+        "  - 本枠（Context & Memory / Harness）で2〜4件を選定したうえで、上記指定領域から最も重要な論文・公式レポートを最大1件だけ追加採用してください（該当なし・0件も許容）。"
+    )
+
+
+def build_07_daily_lexicon(run_date: str) -> tuple[str, str]:
+    """Return (daily_lexicon_bullets, freshness_hint) deterministically rotated by `run_date`."""
+    day = dt.date.fromisoformat(run_date)
+    ordinal = day.toordinal()
+    yymm = f"{day.year % 100:02d}{day.month:02d}"
+    month_en = day.strftime("%B %Y")
+    freshness_hint = f"arXiv {yymm} / {month_en}"
+
+    lines: list[str] = []
+    for idx, (subarea, terms) in enumerate(CONTROL_LEXICON_BY_SUBAREA):
+        first = terms[(ordinal + idx) % len(terms)]
+        second = terms[(ordinal + idx + 2) % len(terms)]
+        picked = first if first == second else f"{first} / {second}"
+        lines.append(f"  - `{subarea}` 本日優先語: `{picked}`")
+
+    fw_picks = [
+        OSS_CONTROL_FRAMEWORKS[(ordinal + offset) % len(OSS_CONTROL_FRAMEWORKS)]
+        for offset in range(0, 9, 3)
+    ]
+    lines.append(f"  - 本日重点 OSS フレームワーク（changelog / release notes）: {', '.join(f'`{fw}`' for fw in fw_picks)}")
+    return "\n".join(lines), freshness_hint
+
+
+def prepare_prompt_text(spec: PromptSpec, run_date: str) -> str:
+    """Render dynamic placeholders in a prompt file for `run_date`."""
+    text = spec.text
+    if "{{DAILY_ROTATION_SLOT}}" in text:
+        text = text.replace("{{DAILY_ROTATION_SLOT}}", build_04_rotation_section(run_date))
+    if "{{DAILY_CONTROL_LEXICON}}" in text or "{{FRESHNESS_HINT}}" in text:
+        lexicon_bullets, freshness_hint = build_07_daily_lexicon(run_date)
+        text = text.replace("{{DAILY_CONTROL_LEXICON}}", lexicon_bullets)
+        text = text.replace("{{FRESHNESS_HINT}}", freshness_hint)
+    return text
+
+
+def _iter_day_markdowns_by_prefix(day_dir: Path, prefix: str) -> list[Path]:
+    if not day_dir.is_dir():
+        return []
+    return sorted(p for p in day_dir.glob(f"*-{prefix}-*.md") if p.is_file())
+
+
+def collect_prompt_dedup_refs(
+    output_root: Path,
+    spec: PromptSpec,
+    run_date: str,
+    days: int = 7,
+    max_refs: int = 160,
+) -> list[str]:
+    """Collect deduplication refs for `spec`, including legacy slugs and 04 -> 07 cross-prompt handoff."""
+    refs = collect_recent_reported_refs(output_root, spec.slug, run_date, days=days, max_refs=max_refs)
+    seen = set(refs)
+    if len(refs) >= max_refs:
+        return refs
+
+    for legacy_slug in LEGACY_PROMPT_SLUGS.get(spec.slug, ()):
+        for ref in collect_recent_reported_refs(output_root, legacy_slug, run_date, days=days, max_refs=max_refs):
+            if ref not in seen:
+                seen.add(ref)
+                refs.append(ref)
+                if len(refs) >= max_refs:
+                    return refs
+
+    if spec.prompt_id == "07" and output_root.is_dir():
+        target_date = dt.date.fromisoformat(run_date)
+        # Include today's (offset=0) and past 7 days' 04 outputs so 07 never duplicates 04.
+        for offset in range(0, days + 1):
+            day_dir = output_root / (target_date - dt.timedelta(days=offset)).isoformat()
+            for md_path in _iter_day_markdowns_by_prefix(day_dir, "04"):
+                if _extract_refs_from_markdown_file(md_path, seen, refs, max_refs):
+                    return refs
+
+    return refs
+
+
+def collect_cross_domain_items_for_06(
+    output_root: Path,
+    run_date: str,
+    days: int = 7,
+    max_items: int = 16,
+) -> list[str]:
+    """Collect recent accepted pickup items from 03 and 07 (including today's already-run reports) for 06 synthesis."""
+    if days < 0 or max_items <= 0 or not output_root.is_dir():
+        return []
+    target_date = dt.date.fromisoformat(run_date)
+    items: list[str] = []
+    seen_titles: set[str] = set()
+    h3_re = re.compile(r"^###\s+(?:\d+\.\s*)?(.+?)\s*$")
+
+    for offset in range(0, days + 1):
+        date_str = (target_date - dt.timedelta(days=offset)).isoformat()
+        day_dir = output_root / date_str
+        for prefix, label in (("03", "03/AD論文"), ("07", "07/Loop・Graph")):
+            for md_path in _iter_day_markdowns_by_prefix(day_dir, prefix):
+                try:
+                    lines = md_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                except OSError:
+                    continue
+                for idx, line in enumerate(lines):
+                    m = h3_re.match(line)
+                    if not m:
+                        continue
+                    title = m.group(1).strip()
+                    if not title or title in seen_titles:
+                        continue
+                    block = "\n".join(lines[idx + 1 : idx + 12])
+                    ref_match = ARXIV_REF_RE.search(block)
+                    ref_str = f"arXiv:{ref_match.group(1)}" if ref_match else ""
+                    if not ref_str:
+                        url_m = EXTRACTED_URL_RE.search(block)
+                        if url_m:
+                            cleaned_u, _ = _split_url_trailing_punct(url_m.group(1))
+                            if is_safe_http_url(cleaned_u):
+                                ref_str = cleaned_u
+                    seen_titles.add(title)
+                    suffix = f" ({ref_str})" if ref_str else ""
+                    items.append(f"[{date_str} {label}] {title}{suffix}")
+                    if len(items) >= max_items:
+                        return items
+    return items
+
+
+def collect_recent_06_hypotheses(
+    output_root: Path,
+    slug: str,
+    run_date: str,
+    days: int = 7,
+    max_items: int = 20,
+) -> list[str]:
+    """Collect previously proposed bottleneck/hypothesis pairs from past 06 (and legacy 05) outputs for dedup."""
+    if days <= 0 or max_items <= 0 or not output_root.is_dir():
+        return []
+    target_date = dt.date.fromisoformat(run_date)
+    entries: list[str] = []
+    seen: set[str] = set()
+    heading_re = re.compile(r"^###\s+(?:ボトルネック|仮説)\d+\s*:\s*(.+?)\s*$")
+    candidate_slugs = (slug, *LEGACY_PROMPT_SLUGS.get(slug, ()))
+
+    for offset in range(1, days + 1):
+        date_str = (target_date - dt.timedelta(days=offset)).isoformat()
+        compact_date = date_str.replace("-", "")
+        day_dir = output_root / date_str
+        if not day_dir.is_dir():
+            continue
+        for cslug in candidate_slugs:
+            md_path = day_dir / f"{compact_date}-{cslug}.md"
+            if not md_path.is_file():
+                continue
+            try:
+                lines = md_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            for idx, line in enumerate(lines):
+                m = heading_re.match(line)
+                if not m:
+                    continue
+                title = m.group(1).strip()
+                extra = ""
+                for sub in lines[idx + 1 : idx + 6]:
+                    if "対象ボトルネック" in sub or "掛け合わせる異分野技術" in sub:
+                        extra += " / " + sub.strip().lstrip("- ")
+                entry = f"[{date_str}] {title}{extra}"
+                if title not in seen:
+                    seen.add(title)
+                    entries.append(entry)
+                    if len(entries) >= max_items:
+                        return entries
+    return entries
 
 
 def build_research_prompt(
     prompt_text: str,
     run_date: str,
     recent_refs: Sequence[str] | None = None,
+    *,
+    cross_domain_items: Sequence[str] | None = None,
+    recent_hypotheses: Sequence[str] | None = None,
 ) -> str:
     """Wrap the prompt with reference date, deduplication refs, injection defense, and output rules."""
     parts = [
@@ -380,9 +647,28 @@ def build_research_prompt(
             [
                 "",
                 "【直近7日間の既出URL/ID一覧（重複排除用）】",
-                "以下は過去7日間の同テーマレポートで既に掲載済みの URL / arXiv ID です。"
+                "以下は過去7日間の同テーマ（および連携元テーマ）レポートで既に掲載済みの URL / arXiv ID です。"
                 "これらは原則として新規枠で再掲せず、重大な続報・新バージョン公開・新ベンチマーク判明等がある場合のみ「【続報】」と明記して差分のみ扱ってください。",
                 *[f"- {ref}" for ref in recent_refs],
+            ]
+        )
+    if cross_domain_items:
+        parts.extend(
+            [
+                "",
+                "【直近7日間の `03`（自動運転論文）および `07`（Loop/Graph 制御）採択項目（転用ネタ元）】",
+                "以下は直近7日間に `03` / `07` で採択された研究・技術項目です。セクション2〜3の異分野転用仮説および最小反証実験の設計に積極活用してください。",
+                *[f"- {item}" for item in cross_domain_items],
+            ]
+        )
+    if recent_hypotheses:
+        parts.extend(
+            [
+                "",
+                "【直近7日間の既出ボトルネック・実験仮説（重複排除用）】",
+                "以下は過去7日間の同テーマで既に設計済みのボトルネックおよび実験仮説です。"
+                "同一の「ボトルネック × 転用手法」は再掲せず、新しいボトルネックまたは異なる異分野技術の組み合わせを提案してください（進展の重要続報のみ「【続報】」として差分記載）。",
+                *[f"- {entry}" for entry in recent_hypotheses],
             ]
         )
     parts.extend(["", prompt_text])
@@ -393,20 +679,15 @@ def _interrupt_handler(signum: int, _frame: Any) -> None:
     raise InterruptedError(f"research runner interrupted by signal {signum}")
 
 
-def run_agy_prompt(
-    prompt_text: str,
-    run_date: str,
-    timeout_sec: int = DEFAULT_TIMEOUT_SEC,
-    agy_bin: str | None = None,
-    source_cli_dir: Path | None = None,
-    recent_refs: Sequence[str] | None = None,
-) -> str:
-    """Execute one research prompt via agy inside an isolated disposable HOME."""
-    agy = agy_bin or shutil.which("agy")
-    if not agy:
-        raise RuntimeError("agy CLI not found in PATH")
-
-    full_prompt = build_research_prompt(prompt_text, run_date, recent_refs=recent_refs)
+def _invoke_agy_once(
+    *,
+    agy: str,
+    full_prompt: str,
+    timeout_sec: int,
+    source_cli_dir: Path | None,
+    model: str | None,
+) -> tuple[int, str, str]:
+    """Run one agy CLI invocation inside a fresh isolated HOME and return (rc, stdout, stderr)."""
     with tempfile.TemporaryDirectory(prefix="daily-research-agy-") as tmp_dir:
         home = Path(tmp_dir) / "home"
         settings_path, workspace = prepare_isolated_home(home, source_cli_dir=source_cli_dir)
@@ -434,8 +715,10 @@ def run_agy_prompt(
             "json",
             "--print-timeout",
             f"{timeout_sec}s",
-            f"--print={full_prompt}",
         ]
+        if model:
+            argv.extend(["--model", model])
+        argv.append(f"--print={full_prompt}")
         proc: subprocess.Popen[str] | None = None
         is_main_thread = threading.current_thread() is threading.main_thread()
         prev_sigterm = signal.getsignal(signal.SIGTERM) if is_main_thread else None
@@ -471,32 +754,87 @@ def run_agy_prompt(
             if is_main_thread:
                 signal.signal(signal.SIGTERM, prev_sigterm)
                 signal.signal(signal.SIGINT, prev_sigint)
+        return proc.returncode, stdout, stderr
 
-        if proc.returncode != 0:
-            err_snippet = (stderr or "").strip().splitlines()
-            detail = f": {err_snippet[-1][:200]}" if err_snippet else ""
-            raise RuntimeError(f"agy exited with status {proc.returncode}{detail}")
 
-        try:
-            envelope = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("agy did not return valid JSON output") from exc
+def run_agy_prompt(
+    prompt_text: str,
+    run_date: str,
+    timeout_sec: int = DEFAULT_TIMEOUT_SEC,
+    agy_bin: str | None = None,
+    source_cli_dir: Path | None = None,
+    recent_refs: Sequence[str] | None = None,
+    cross_domain_items: Sequence[str] | None = None,
+    recent_hypotheses: Sequence[str] | None = None,
+    model: str | None = None,
+    fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
+) -> str:
+    """Execute one research prompt via agy inside an isolated disposable HOME."""
+    agy = agy_bin or shutil.which("agy")
+    if not agy:
+        raise RuntimeError("agy CLI not found in PATH")
 
-        if not isinstance(envelope, dict) or envelope.get("status") != "SUCCESS":
-            status = envelope.get("status", "invalid") if isinstance(envelope, dict) else "invalid"
-            raise RuntimeError(f"agy returned non-success status: {status}")
+    full_prompt = build_research_prompt(
+        prompt_text,
+        run_date,
+        recent_refs=recent_refs,
+        cross_domain_items=cross_domain_items,
+        recent_hypotheses=recent_hypotheses,
+    )
+    candidates: list[str | None] = [model or None]
+    fb = (fallback_model or "").strip() or None
+    if fb and fb != candidates[0]:
+        candidates.append(fb)
 
-        if envelope.get("denied_actions"):
-            raise RuntimeError("agy requested a denied tool action")
+    returncode = 1
+    stdout = ""
+    stderr = ""
+    for idx, candidate_model in enumerate(candidates):
+        returncode, stdout, stderr = _invoke_agy_once(
+            agy=agy,
+            full_prompt=full_prompt,
+            timeout_sec=timeout_sec,
+            source_cli_dir=source_cli_dir,
+            model=candidate_model,
+        )
+        if returncode == 0:
+            break
+        combined_err = f"{stderr}\n{stdout}"
+        is_quota = "RESOURCE_EXHAUSTED" in combined_err or "code 429" in combined_err
+        if is_quota and idx + 1 < len(candidates):
+            _safe_log(
+                f"[warn] agy quota exhausted on {candidate_model or 'default'}; "
+                f"falling back to {candidates[idx + 1]}",
+                stream=sys.stderr,
+            )
+            continue
+        break
 
-        response = envelope.get("response")
-        if not isinstance(response, str) or not response.strip():
-            raise RuntimeError("agy returned an empty response")
+    if returncode != 0:
+        err_snippet = (stderr or "").strip().splitlines()
+        detail = f": {err_snippet[-1][:200]}" if err_snippet else ""
+        raise RuntimeError(f"agy exited with status {returncode}{detail}")
 
-        if len(response.encode("utf-8", errors="replace")) > MAX_RESPONSE_BYTES:
-            raise RuntimeError("agy response exceeded size limit")
+    try:
+        envelope = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("agy did not return valid JSON output") from exc
 
-        return response.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+    if not isinstance(envelope, dict) or envelope.get("status") != "SUCCESS":
+        status = envelope.get("status", "invalid") if isinstance(envelope, dict) else "invalid"
+        raise RuntimeError(f"agy returned non-success status: {status}")
+
+    if envelope.get("denied_actions"):
+        raise RuntimeError("agy requested a denied tool action")
+
+    response = envelope.get("response")
+    if not isinstance(response, str) or not response.strip():
+        raise RuntimeError("agy returned an empty response")
+
+    if len(response.encode("utf-8", errors="replace")) > MAX_RESPONSE_BYTES:
+        raise RuntimeError("agy response exceeded size limit")
+
+    return response.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
 
 
 def is_safe_http_url(url: str) -> bool:
@@ -1129,6 +1467,7 @@ def render_report_html(
     if "</style" in css_text.lower():
         raise ValueError("CSS file contains forbidden closing style tag")
 
+    markdown_text, _ = sanitize_hangul(markdown_text)
     body_html, toc_entries, extracted_title, summary_bullets = convert_markdown_body(markdown_text)
     if not toc_entries:
         sec_id = "sec-1"
@@ -1259,6 +1598,13 @@ def rerender_daily_reports(
             _safe_log(f"[skip] {spec.slug} (missing {md_path})")
             continue
         markdown_out = md_path.read_text(encoding="utf-8")
+        markdown_out, hangul_hits = sanitize_hangul(markdown_out)
+        if hangul_hits:
+            _safe_log(
+                f"[warn] {spec.slug}: stripped {len(hangul_hits)} Hangul token(s) on rerender: {hangul_hits}",
+                stream=sys.stderr,
+            )
+            _atomic_write_text(md_path, markdown_out)
         generated_at = _now_jst().isoformat(timespec="seconds")
         html_out = render_report_html(
             markdown_out,
@@ -1307,6 +1653,8 @@ def run_daily(
     dry_run: bool = False,
     rerender: bool = False,
     timeout_sec: int = DEFAULT_TIMEOUT_SEC,
+    model: str | None = None,
+    fallback_model: str | None = DEFAULT_FALLBACK_MODEL,
     runner: Callable[[str, str, int], str] | None = None,
 ) -> int:
     """Execute scheduled daily research prompts with idempotent state tracking."""
@@ -1330,20 +1678,34 @@ def run_daily(
             md_path = day_output_dir / f"{compact_date}-{spec.slug}.md"
             html_path = day_output_dir / f"{compact_date}-{spec.slug}.html"
             dash_path = dashboard_reports_dir / f"{compact_date}-{spec.slug}.html"
-            recent_refs = collect_recent_reported_refs(output_root, spec.slug, effective_date)
-            plan.append(
-                {
-                    "slug": spec.slug,
-                    "prompt_file": str(spec.path),
-                    "action": ("rerender" if md_path.is_file() else "skip") if rerender else ("skip" if would_skip else "run"),
-                    "existing_status": existing.get("status"),
-                    "recent_refs_count": len(recent_refs),
-                    "timeout_sec": timeout_sec,
-                    "markdown_path": str(md_path),
-                    "html_path": str(html_path),
-                    "dashboard_html_path": str(dash_path),
-                }
+            recent_refs = collect_prompt_dedup_refs(output_root, spec, effective_date)
+            cross_domain_items = (
+                collect_cross_domain_items_for_06(output_root, effective_date)
+                if spec.prompt_id == "06"
+                else []
             )
+            recent_hypotheses = (
+                collect_recent_06_hypotheses(output_root, spec.slug, effective_date)
+                if spec.prompt_id == "06"
+                else []
+            )
+            entry: dict[str, Any] = {
+                "slug": spec.slug,
+                "prompt_file": str(spec.path),
+                "action": ("rerender" if md_path.is_file() else "skip") if rerender else ("skip" if would_skip else "run"),
+                "existing_status": existing.get("status"),
+                "recent_refs_count": len(recent_refs),
+                "cross_domain_items_count": len(cross_domain_items),
+                "recent_hypotheses_count": len(recent_hypotheses),
+                "timeout_sec": timeout_sec,
+                "markdown_path": str(md_path),
+                "html_path": str(html_path),
+                "dashboard_html_path": str(dash_path),
+            }
+            if spec.prompt_id == "04":
+                rot = ROTATION_SLOTS.get(dt.date.fromisoformat(effective_date).weekday())
+                entry["rotation_focus"] = rot[0] if rot else None
+            plan.append(entry)
         print(
             json.dumps(
                 {
@@ -1386,18 +1748,42 @@ def run_daily(
         md_path = day_output_dir / f"{compact_date}-{spec.slug}.md"
         html_path = day_output_dir / f"{compact_date}-{spec.slug}.html"
         dash_path = dashboard_reports_dir / f"{compact_date}-{spec.slug}.html"
-        recent_refs = collect_recent_reported_refs(output_root, spec.slug, effective_date)
-        _safe_log(f"[run] {spec.slug} (timeout={timeout_sec}s, recent_refs={len(recent_refs)})")
+        prepared_prompt = prepare_prompt_text(spec, effective_date)
+        recent_refs = collect_prompt_dedup_refs(output_root, spec, effective_date)
+        cross_domain_items = (
+            collect_cross_domain_items_for_06(output_root, effective_date)
+            if spec.prompt_id == "06"
+            else []
+        )
+        recent_hypotheses = (
+            collect_recent_06_hypotheses(output_root, spec.slug, effective_date)
+            if spec.prompt_id == "06"
+            else []
+        )
+        _safe_log(
+            f"[run] {spec.slug} (timeout={timeout_sec}s, recent_refs={len(recent_refs)}, "
+            f"cross_domain={len(cross_domain_items)}, recent_hypotheses={len(recent_hypotheses)})"
+        )
 
         try:
             if runner is not None:
-                markdown_out = runner(spec.text, effective_date, timeout_sec)
+                markdown_out = runner(prepared_prompt, effective_date, timeout_sec)
             else:
                 markdown_out = run_agy_prompt(
-                    spec.text,
+                    prepared_prompt,
                     effective_date,
                     timeout_sec=timeout_sec,
                     recent_refs=recent_refs,
+                    cross_domain_items=cross_domain_items,
+                    recent_hypotheses=recent_hypotheses,
+                    model=model,
+                    fallback_model=fallback_model,
+                )
+            markdown_out, hangul_hits = sanitize_hangul(markdown_out)
+            if hangul_hits:
+                _safe_log(
+                    f"[warn] {spec.slug}: stripped {len(hangul_hits)} Hangul token(s): {hangul_hits}",
+                    stream=sys.stderr,
                 )
             generated_at = _now_jst().isoformat(timespec="seconds")
             html_out = render_report_html(
@@ -1494,6 +1880,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Re-render existing Markdown files for --date to HTML and Dashboard without calling agy",
     )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("DAILY_RESEARCH_MODEL") or None,
+        help="Model to pass to agy CLI (--model)",
+    )
+    parser.add_argument(
+        "--fallback-model",
+        default=os.environ.get("DAILY_RESEARCH_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL),
+        help=f"Fallback model on RESOURCE_EXHAUSTED/429 (default: {DEFAULT_FALLBACK_MODEL}; empty to disable)",
+    )
     return parser.parse_args(argv)
 
 
@@ -1520,6 +1916,8 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             rerender=args.rerender,
             timeout_sec=args.timeout,
+            model=args.model,
+            fallback_model=args.fallback_model,
         )
     except (ValueError, FileNotFoundError, OSError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
