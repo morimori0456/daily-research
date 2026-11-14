@@ -1,38 +1,68 @@
-LLM・Agent技術・Harness/Context Engineering 論文・トレンド調査
+# LLM・Agent技術・Context/Harness Engineering 論文・技術レポート調査
 
-今日から遡って過去1週間の間に公開された、あるいはSNS（X、Reddit、Hacker News）やarXiv、GitHub、技術ブログなどで大きな話題となった「Context Engineering」および「Harness Engineering」に関連する論文や技術レポートを5〜7件ピックアップしてください。
+【目的】
+直近24〜48時間（インデックス遅延等を考慮し、直近7日以内の未掲載重要項目は「`【遅延発見】`」として許容）で公開された、LLM の入出力・記憶制御および Agent の実行・評価・制御基盤（Context Engineering / Harness Engineering 等）に関する論文・公式技術レポートを調査し、システム設計と実務応用の観点から構造化した日次レポートを作成してください。
 
-※一般的な基礎モデルの事前学習（Pre-training）やパラメータスケーリングに関する論文は除外し、LLMの入出力・記憶制御や、Agentの実行・評価システムに焦点を当てたエンジニアリング手法を優先してください。
-
-
+【対象外・スコープ境界】
+- 一般的な基礎モデルの事前学習（Pre-training）やパラメータスケーリング則そのものを主眼とする論文は除外してください。
+- 推論エンジンの運用 Tips・一般モデル更新は別テーマ（01）、開発ツール単体の紹介は別テーマ（02）で扱うため、本レポートは**Agent アーキテクチャ、Context/Memory 制御、実行ハーネス/サンドボックス、評価・検証手法の設計と定量的実証**に集中してください。
 
 【対象とする技術領域とキーワード】
+キーワードの名称一致だけでなく、解決する課題・システム設計・実証評価の中身で採否を判断してください。
 
-以下のいずれか（または複数）に深く関連する内容を調査対象としてください。
+1. **Context Engineering（文脈・記憶・プロンプト構造の最適化）**
+   - 例: In-Context Learning (ICL) の動的最適化、階層型/長期メモリ（Hierarchical / Long-term Memory）、Long-context の効率化、Context Compression（文脈圧縮）、KV-Cache の構造化・最適化、Dynamic Prompting、高度な RAG 制御
+2. **Harness Engineering（Agent 実行環境・サンドボックス・評価基盤）**
+   - 例: Agent Harness Design、Sandboxing（安全なコード・ツール実行・権限境界・Reward Hacking 防御）、Test-time Compute / Reasoning の制御ラッパー、LLM-as-a-Judge / Evaluator Harness、ベンチマーク環境（SWE-bench, WebArena 等）の構築・厳格化手法、決定的テストと非決定的評価の統合
+3. **Loop Engineering（反復試行・自己修復・推論ループの制御）**
+   - 例: Agent execution loop（実行・フィードバック・再試行制御）、Self-Correction / Reflection loop（自己修正・リフレクション）、Test-time Search / MCTS（モンテカルロ木検索）などの推論時ループ、Human-in-the-loop（人間の介入制御）、無限ループ防止・早期終了・予算制御アルゴリズム
+4. **Graph Engineering（グラフ構造によるワークフロー・協調・知識表現）**
+   - 例: Graph-based Agent Workflow / DAG（有向非巡回グラフ）制御、Graph-of-Thought (GoT)、Multi-Agent Collaboration Graph（複数 Agent の相互作用グラフ）、Knowledge Graph + RAG (GraphRAG)、State Graph（状態遷移エンジニアリング）
+5. **新出の「〜 Engineering」（実体のある技術手法のみ）**
+   - 例: **Flow Engineering**, **Memory Engineering**, **Tool Engineering**, **State Engineering** 等。
+   - **採用条件**: 単なるブログの造語・バズワード記事や既存手法の言い換えだけの記事は**除外**し、**具体的なシステム設計・実装・定量的評価を伴う論文または公式技術レポートのみ**に限定してください。
 
+【採用件数の方針】
+- 本日のピックアップは**最大3〜5件**に厳選してください。
+- 該当が少ない日は無理に件数を埋めず、**0〜3件（該当なし・0件も正常結果として許容）**で構いません。
 
-
-1. **Context Engineering（文脈・記憶・プロンプト構造の最適化）** - 例：In-Context Learning (ICL) の動的最適化、階層型/長期メモリ（Hierarchical / Long-term Memory）、Long-contextの効率化、Context Compression（文脈圧縮）、KV-Cacheの構造化・最適化、Dynamic Prompting、高度なRAG制御2. **Harness Engineering（Agent実行環境・サンドボックス・評価基盤）** - 例：Agent Harness Design、Sandboxing（安全なコード・ツールの実行環境）、Test-time Compute / Reasoningの制御 wrapper、LLM-as-a-Judge / Evaluator Harness、ベンチマーク環境（SWE-bench, WebArena等）の構築手法、Deterministic（確定的）テストと非確定的評価の統合3. **Loop Engineering（反復試行・自己修復・推論ループの制御）** - 例：Agent execution loop（実行・フィードバック・再試行制御）、Self-Correction / Reflection loop（自己修正・リフレクション）、Test-time Search / MCTS（モンテカルロ木検索）などの推論時ループ、Human-in-the-loop（人間の介入制御）、無限ループ防止・早期終了アルゴリズム4. **Graph Engineering（グラフ構造によるワークフロー・協調・知識表現）** - 例：Graph-based Agent Workflow / DAG（有向非巡回グラフ）制御（LangGraph等）、Graph-of-Thought (GoT)、Multi-Agent Collaboration Graph（複数Agentの相互作用グラフ）、Knowledge Graph + RAG (GraphRAG)、State Graph（状態遷移エンジニアリング）5. **新出の「〜 Engineering」（新提唱・新概念の技術手法）** - 例：**Flow Engineering**（複雑なワークフロー・コントロールフロー設計）、**Memory Engineering**（エピソード/セマンティック記憶の外部構造化）、**Tool Engineering**（Agent専用API/ツールの自動生成・構造最適化）、**State Engineering**（Agentの分散状態・継続セッション管理）など、新しく提唱されたEngineering概念や手法 
-
-【各項目についての出力フォーマット】
-
-選定した各論文・レポートについて、以下の項目を日本語で簡潔にまとめてください：
-
-
-
-タイトル、発表日、著者/組織（arXiv、GitHub、公式ブログ等のリンクを含む）
-
-技術の核心（何が画期的なのか。どのような課題を解決するシステム・構造設計なのか）
-
-話題になった理由（SNSやHacker Newsでの反響、GitHub Starの急増、著名研究者・エンジニアの言及、主要ベンチマークでの新記録など）
-
-実用・開発へのインパクト（実際のAgentフレームワーク実装、プロダクション環境のContext管理、評価パイプラインにどのような影響を与えるか）
+【各項目についてまとめる内容】
+1. **タイトル・発表日・著者/組織・URL・arXiv ID（該当する場合）**
+2. **資料種別・コード公開有無**
+   - 資料種別を「査読論文（会議/ジャーナル名）」/「プレプリント（arXiv）」/「公式技術レポート」から明記し、コード・ベンチマーク公開の有無を記載してください。
+3. **解決する課題とアーキテクチャ**
+   - 何がボトルネックであり、どのような構造・アルゴリズム・制御機構を提案しているか。
+4. **評価条件と定量的効果・限界**
+   - 使用ベンチマーク・ベースライン・測定条件、確認できた定量的改善値、および著者らが挙げている限界・制約事項（未確認の数値やSNS反響は「未確認」と明記）。
+5. **自身のマルチエージェント / CLI ハーネス運用への応用可能性**
+   - `Claude Code` / `Codex` / `Antigravity` / サンドボックス隔離実行環境 / 複数エージェント協調パイプラインにおける、コンテキスト管理・権限境界・評価・ループ制御への具体的な応用示唆（論文実証事実と設計考察を分離して記載）。
 
 【優先して参照すべき情報源・コミュニティ】
+- **論文・プレプリント**: `arXiv`（`cs.CL`, `cs.AI`, `cs.SE`）, Hugging Face Papers, NeurIPS / ICLR / ICML / ACL / EMNLP 等の採択公開
+- **公式技術レポート・主要研究機関**: OpenAI, Anthropic, Google DeepMind, Meta AI, Stanford, UC Berkeley, Microsoft, MIT 等
+- **OSS フレームワーク・技術議論**: DSPy, LangGraph, LlamaIndex, SGLang, vLLM, Hacker News
 
-主要カンファレンス/プレプリント: NeurIPS, ICLR, ICML, ACL, EMNLP等の採択・arXiv最新論文
+【出力フォーマット（必須構造）】
+```markdown
+# LLM・Agent技術・Context/Harness Engineering 論文・技術レポート調査
 
-主要ラボ・組織: OpenAI, Anthropic, Google DeepMind, Meta AI, Stanford (DSPyチーム等), UC Berkeley, Microsoft, MIT等
+## 要点サマリー (TL;DR)
+- 本日の論文・技術レポート動向の結論を3〜5行の箇条書きで簡潔に記載
 
-主要フレームワーク・基盤: DSPy, LangChain, LlamaIndex, AutoGen, CrewAI, SGLang, vLLM などのエコシステムにおける最適化の取り組み 
+## ピックアップ論文・技術レポート
+### 1. <タイトル>（区分: 新規公開 / 【遅延発見】 / 【続報】 | 領域: Context / Harness / Loop / Graph）
+- **発表日・資料種別**: YYYY-MM-DD | 査読論文 / プレプリント / 公式技術レポート
+- **著者・組織**: ...
+- **URL / arXiv ID**: ...（コード公開: あり(URL) / なし / 未確認）
+- **解決する課題とアーキテクチャ**: ...
+- **評価条件と定量的効果・限界**: ...
+- **マルチエージェント / CLIハーネス運用への応用可能性**: ...
 
+## 参照ソース一覧
+| # | 論文・レポート名 | URL | 公開/更新日 | 一次/二次区分・read_url確認状況 |
+| --- | --- | --- | --- | --- |
+```
+
+【制約・品質基準】
+- `read_url` で一次ソース本文・アブストラクトを確認できた事実と、推測・未確認事項を明確に区別し、確認できない項目は「未確認」と明記してください。
+- 数式や矢印に LaTeX 記法（`$\rightarrow$` 等）を使わず、プレーンな Unicode 文字（`→`, `×`, `≥` 等）を使用してください。
