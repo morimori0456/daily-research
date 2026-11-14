@@ -1,0 +1,38 @@
+LLM・Agent技術・Harness/Context Engineering 論文・トレンド調査
+
+今日から遡って過去1週間の間に公開された、あるいはSNS（X、Reddit、Hacker News）やarXiv、GitHub、技術ブログなどで大きな話題となった「Context Engineering」および「Harness Engineering」に関連する論文や技術レポートを5〜7件ピックアップしてください。
+
+※一般的な基礎モデルの事前学習（Pre-training）やパラメータスケーリングに関する論文は除外し、LLMの入出力・記憶制御や、Agentの実行・評価システムに焦点を当てたエンジニアリング手法を優先してください。
+
+
+
+【対象とする技術領域とキーワード】
+
+以下のいずれか（または複数）に深く関連する内容を調査対象としてください。
+
+
+
+1. **Context Engineering（文脈・記憶・プロンプト構造の最適化）** - 例：In-Context Learning (ICL) の動的最適化、階層型/長期メモリ（Hierarchical / Long-term Memory）、Long-contextの効率化、Context Compression（文脈圧縮）、KV-Cacheの構造化・最適化、Dynamic Prompting、高度なRAG制御2. **Harness Engineering（Agent実行環境・サンドボックス・評価基盤）** - 例：Agent Harness Design、Sandboxing（安全なコード・ツールの実行環境）、Test-time Compute / Reasoningの制御 wrapper、LLM-as-a-Judge / Evaluator Harness、ベンチマーク環境（SWE-bench, WebArena等）の構築手法、Deterministic（確定的）テストと非確定的評価の統合3. **Loop Engineering（反復試行・自己修復・推論ループの制御）** - 例：Agent execution loop（実行・フィードバック・再試行制御）、Self-Correction / Reflection loop（自己修正・リフレクション）、Test-time Search / MCTS（モンテカルロ木検索）などの推論時ループ、Human-in-the-loop（人間の介入制御）、無限ループ防止・早期終了アルゴリズム4. **Graph Engineering（グラフ構造によるワークフロー・協調・知識表現）** - 例：Graph-based Agent Workflow / DAG（有向非巡回グラフ）制御（LangGraph等）、Graph-of-Thought (GoT)、Multi-Agent Collaboration Graph（複数Agentの相互作用グラフ）、Knowledge Graph + RAG (GraphRAG)、State Graph（状態遷移エンジニアリング）5. **新出の「〜 Engineering」（新提唱・新概念の技術手法）** - 例：**Flow Engineering**（複雑なワークフロー・コントロールフロー設計）、**Memory Engineering**（エピソード/セマンティック記憶の外部構造化）、**Tool Engineering**（Agent専用API/ツールの自動生成・構造最適化）、**State Engineering**（Agentの分散状態・継続セッション管理）など、新しく提唱されたEngineering概念や手法 
+
+【各項目についての出力フォーマット】
+
+選定した各論文・レポートについて、以下の項目を日本語で簡潔にまとめてください：
+
+
+
+タイトル、発表日、著者/組織（arXiv、GitHub、公式ブログ等のリンクを含む）
+
+技術の核心（何が画期的なのか。どのような課題を解決するシステム・構造設計なのか）
+
+話題になった理由（SNSやHacker Newsでの反響、GitHub Starの急増、著名研究者・エンジニアの言及、主要ベンチマークでの新記録など）
+
+実用・開発へのインパクト（実際のAgentフレームワーク実装、プロダクション環境のContext管理、評価パイプラインにどのような影響を与えるか）
+
+【優先して参照すべき情報源・コミュニティ】
+
+主要カンファレンス/プレプリント: NeurIPS, ICLR, ICML, ACL, EMNLP等の採択・arXiv最新論文
+
+主要ラボ・組織: OpenAI, Anthropic, Google DeepMind, Meta AI, Stanford (DSPyチーム等), UC Berkeley, Microsoft, MIT等
+
+主要フレームワーク・基盤: DSPy, LangChain, LlamaIndex, AutoGen, CrewAI, SGLang, vLLM などのエコシステムにおける最適化の取り組み 
+
