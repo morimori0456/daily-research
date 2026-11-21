@@ -705,7 +705,7 @@ print(json.dumps({{"status": "SUCCESS", "response": "## 調査結果\\n\\n- テ�
 import json, sys
 with open({str(calls_file)!r}, "a", encoding="utf-8") as fh:
     fh.write(json.dumps(sys.argv[1:]) + "\\n")
-if "--model" in sys.argv and sys.argv[sys.argv.index("--model") + 1] == "gemini-4-hydrogen-medium":
+if "--model" in sys.argv and sys.argv[sys.argv.index("--model") + 1] == "gemini-4-neon-medium":
     print(json.dumps({{"status": "SUCCESS", "response": "# Fallback OK\\n\\n## 要点サマリー (TL;DR)\\n- ok"}}))
     sys.exit(0)
 sys.stderr.write('AGY_ERROR: {{"status":"RESOURCE_EXHAUSTED","short_error":"RESOURCE_EXHAUSTED (code 429)"}}\\n')
@@ -724,11 +724,11 @@ sys.exit(3)
                     source_cli_dir=cli_dir,
                 )
             self.assertIn("Fallback OK", out)
-            self.assertIn("falling back to gemini-4-hydrogen-medium", stderr_buf.getvalue())
+            self.assertIn("falling back to gemini-4-neon-medium", stderr_buf.getvalue())
             calls = [json.loads(line) for line in calls_file.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(calls), 2)
-            self.assertIn("gemini-4-hydrogen-high", calls[0])
-            self.assertIn("gemini-4-hydrogen-medium", calls[1])
+            self.assertIn("gemini-4-neon-high", calls[0])
+            self.assertIn("gemini-4-neon-medium", calls[1])
 
     def test_run_agy_prompt_rejects_denied_actions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1024,7 +1024,7 @@ else:
                 json.loads(line) for line in captured_calls.read_text(encoding="utf-8").splitlines()
             ]
             self.assertEqual(len(recorded_calls), 2)
-            self.assertEqual(recorded_calls[0]["model"], "gemini-4-hydrogen-high")
+            self.assertEqual(recorded_calls[0]["model"], "gemini-4-neon-high")
             self.assertEqual(recorded_calls[1]["model"], "gemini-4-argon-low")
             prompt_sent = recorded_calls[0]["prompt"]
             self.assertIn("arXiv:2611.55555", prompt_sent)
@@ -1492,8 +1492,8 @@ class HydrogenArgonSplitAndReviewTests(unittest.TestCase):
         return prompts_dir, output_root, dash_root, env
 
     def test_default_models_and_parse_args(self) -> None:
-        self.assertEqual(rdr.DEFAULT_RESEARCH_MODEL, "gemini-4-hydrogen-high")
-        self.assertEqual(rdr.DEFAULT_FALLBACK_MODEL, "gemini-4-hydrogen-medium")
+        self.assertEqual(rdr.DEFAULT_RESEARCH_MODEL, "gemini-4-neon-high")
+        self.assertEqual(rdr.DEFAULT_FALLBACK_MODEL, "gemini-4-neon-medium")
         self.assertEqual(rdr.DEFAULT_REVIEW_MODEL, "gemini-4-argon-low")
         self.assertEqual(rdr.DEFAULT_REVIEW_TIMEOUT_SEC, 300)
 
@@ -1501,8 +1501,8 @@ class HydrogenArgonSplitAndReviewTests(unittest.TestCase):
             for key in ("DAILY_RESEARCH_MODEL", "DAILY_RESEARCH_FALLBACK_MODEL", "DAILY_RESEARCH_REVIEW_MODEL"):
                 os.environ.pop(key, None)
             args = rdr.parse_args([])
-            self.assertEqual(args.model, "gemini-4-hydrogen-high")
-            self.assertEqual(args.fallback_model, "gemini-4-hydrogen-medium")
+            self.assertEqual(args.model, "gemini-4-neon-high")
+            self.assertEqual(args.fallback_model, "gemini-4-neon-medium")
             self.assertEqual(args.review_model, "gemini-4-argon-low")
             self.assertFalse(args.no_review)
             self.assertEqual(args.review_timeout, 300)
@@ -1562,7 +1562,7 @@ else:
             self.assertIn("stripped 1 Hangul token(s) from review", proc.stderr)
 
             calls = [json.loads(line) for line in calls_log.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual([c["model"] for c in calls], ["gemini-4-hydrogen-high", "gemini-4-argon-low"])
+            self.assertEqual([c["model"] for c in calls], ["gemini-4-neon-high", "gemini-4-argon-low"])
             self.assertIn("監査対象プロンプト: 02-beta", calls[1]["prompt"])
 
             md_text = (output_root / "2026-11-15" / "20261115-02-beta.md").read_text(encoding="utf-8")
@@ -1577,7 +1577,7 @@ else:
             state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
             entry = state["prompts"]["02-beta"]
             self.assertEqual(entry["status"], "completed")
-            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(entry["research_model"], "gemini-4-neon-high")
             self.assertEqual(entry["review_model"], "gemini-4-argon-low")
             self.assertEqual(entry["review_status"], "completed")
             self.assertIsNone(entry["review_error"])
@@ -1623,7 +1623,7 @@ print(json.dumps({"status": "SUCCESS", "response": "# Beta レポート\\n\\n## 
             state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
             entry = state["prompts"]["02-beta"]
             self.assertEqual(entry["status"], "completed")
-            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(entry["research_model"], "gemini-4-neon-high")
             self.assertEqual(entry["review_model"], "gemini-4-argon-low")
             self.assertEqual(entry["review_status"], "skipped_quota")
             self.assertIn("429", entry["review_error"] or "")
@@ -1681,7 +1681,7 @@ print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n##
 """
             _prompts_dir, output_root, dash_root, env = self._setup_cli_env(root, agy_script)
 
-            # --dry-run does not call agy and reports hydrogen/argon model plan
+            # --dry-run does not call agy and reports neon/argon model plan
             dry_proc = subprocess.run(
                 [
                     sys.executable,
@@ -1700,8 +1700,8 @@ print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n##
             self.assertEqual(dry_proc.returncode, 0, msg=dry_proc.stderr)
             self.assertFalse(calls_log.exists())
             dry_plan = json.loads(dry_proc.stdout)
-            self.assertEqual(dry_plan["research_model"], "gemini-4-hydrogen-high")
-            self.assertEqual(dry_plan["fallback_model"], "gemini-4-hydrogen-medium")
+            self.assertEqual(dry_plan["research_model"], "gemini-4-neon-high")
+            self.assertEqual(dry_plan["fallback_model"], "gemini-4-neon-medium")
             self.assertEqual(dry_plan["review_model"], "gemini-4-argon-low")
             self.assertTrue(dry_plan["review_enabled"])
             self.assertEqual(dry_plan["review_timeout_sec"], 300)
@@ -1727,11 +1727,11 @@ print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n##
             )
             self.assertEqual(proc.returncode, 0, msg=proc.stderr)
             calls = [json.loads(line) for line in calls_log.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual([c["model"] for c in calls], ["gemini-4-hydrogen-high"])
+            self.assertEqual([c["model"] for c in calls], ["gemini-4-neon-high"])
             state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
             entry = state["prompts"]["02-beta"]
             self.assertEqual(entry["status"], "completed")
-            self.assertEqual(entry["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(entry["research_model"], "gemini-4-neon-high")
             self.assertIsNone(entry["review_model"])
             self.assertEqual(entry["review_status"], "disabled")
             self.assertIsNone(entry["review_error"])
@@ -1757,7 +1757,7 @@ print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n##
             self.assertFalse(calls_log.exists())
             state_after = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
             self.assertEqual(state_after["prompts"]["02-beta"]["review_status"], "disabled")
-            self.assertEqual(state_after["prompts"]["02-beta"]["research_model"], "gemini-4-hydrogen-high")
+            self.assertEqual(state_after["prompts"]["02-beta"]["research_model"], "gemini-4-neon-high")
             self.assertTrue((dash_root / "reports" / "daily-research" / "20261115-02-beta.html").is_file())
 
 
