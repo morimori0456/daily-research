@@ -1496,6 +1496,7 @@ class HydrogenArgonSplitAndReviewTests(unittest.TestCase):
         self.assertEqual(rdr.DEFAULT_FALLBACK_MODEL, "gemini-4-neon-medium")
         self.assertEqual(rdr.DEFAULT_REVIEW_MODEL, "gemini-4-argon-low")
         self.assertEqual(rdr.DEFAULT_REVIEW_TIMEOUT_SEC, 300)
+        self.assertEqual(rdr.DEFAULT_MAX_REVISIONS, 1)
 
         with mock.patch.dict(os.environ, {}, clear=False):
             for key in ("DAILY_RESEARCH_MODEL", "DAILY_RESEARCH_FALLBACK_MODEL", "DAILY_RESEARCH_REVIEW_MODEL"):
@@ -1567,12 +1568,10 @@ else:
 
             md_text = (output_root / "2026-11-15" / "20261115-02-beta.md").read_text(encoding="utf-8")
             html_text = (dash_root / "reports" / "daily-research" / "20261115-02-beta.html").read_text(encoding="utf-8")
-            self.assertEqual(md_text.count("## Argon 品質レビュー所見"), 1)
+            self.assertNotIn("Argon 品質レビュー所見", md_text)
             self.assertNotIn("古い見出し", md_text)
-            self.assertIn("PASS_WITH_NOTES", md_text)
             self.assertNotRegex(md_text, r"[\uAC00-\uD7AF]")
-            self.assertIn("Argon 品質レビュー所見", html_text)
-            self.assertIn("PASS_WITH_NOTES", html_text)
+            self.assertNotIn("Argon 品質レビュー所見", html_text)
 
             state = json.loads((output_root / "2026-11-15" / "state.json").read_text(encoding="utf-8"))
             entry = state["prompts"]["02-beta"]
@@ -1759,6 +1758,139 @@ print(json.dumps({{"status": "SUCCESS", "response": "# Beta レポート\\n\\n##
             self.assertEqual(state_after["prompts"]["02-beta"]["review_status"], "disabled")
             self.assertEqual(state_after["prompts"]["02-beta"]["research_model"], "gemini-4-neon-high")
             self.assertTrue((dash_root / "reports" / "daily-research" / "20261115-02-beta.html").is_file())
+
+    def test_parse_argon_verdict_and_revision_loop_e2e(self) -> None:
+        self.assertEqual(rdr.parse_argon_verdict("- **判定**: `PASS`"), "PASS")
+        self.assertEqual(rdr.parse_argon_verdict("- **判定**: `PASS_WITH_NOTES`"), "PASS_WITH_NOTES")
+        self.assertEqual(rdr.parse_argon_verdict("- **判定**: NEEDS_REVISION"), "NEEDS_REVISION")
+        self.assertIsNone(rdr.parse_argon_verdict("判定なし"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir = root / "prompts"
+            prompts_dir.mkdir()
+            (prompts_dir / "02-beta.txt").write_text("# Beta\n調査して\n", encoding="utf-8")
+            output_root = root / "output"
+            dash_root = root / "dash"
+            css_path = DAILY_RESEARCH_DIR / "document.css"
+
+            research_calls: list[str] = []
+            review_calls: list[str] = []
+
+            def fake_runner(prompt_text: str, run_date: str, timeout_sec: int) -> str:
+                research_calls.append(prompt_text)
+                if "Argon レビュー指摘（要修正）" in prompt_text:
+                    return "# Beta 改訂版\n\n## 要点サマリー (TL;DR)\n- 修正済み内容\n\n## Argon 品質レビュー所見\n- 古い所見\n"
+                return "# Beta 初稿\n\n## 要点サマリー (TL;DR)\n- 未確認コマンドあり\n"
+
+            def fake_review_runner(
+                spec: rdr.PromptSpec,
+                markdown_body: str,
+                run_date: str,
+                community_buzz_lines: rdr.Sequence[str],
+                review_model: str,
+                review_timeout_sec: int,
+            ) -> str:
+                review_calls.append(markdown_body)
+                if "未確認コマンドあり" in markdown_body:
+                    return "## Argon 品質レビュー所見\n\n- **判定**: `NEEDS_REVISION`\n- 未確認コマンドを削除してください。\n"
+                return "## Argon 品質レビュー所見\n\n- **判定**: `PASS`\n- 修正を確認しました。\n"
+
+            rc = rdr.run_daily(
+                prompts_dir=prompts_dir,
+                output_root=output_root,
+                dashboard_reports_dir=dash_root,
+                css_path=css_path,
+                run_date="2026-11-22",
+                only="02",
+                max_revisions=1,
+                enable_community=False,
+                runner=fake_runner,
+                review_runner=fake_review_runner,
+            )
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(research_calls), 2)
+            self.assertEqual(len(review_calls), 2)
+            self.assertIn("未確認コマンドを削除してください", research_calls[1])
+
+            md_text = (output_root / "2026-11-22" / "20261122-02-beta.md").read_text(encoding="utf-8")
+            self.assertIn("Beta 改訂版", md_text)
+            self.assertIn("修正済み内容", md_text)
+            self.assertNotIn("未確認コマンドあり", md_text)
+            self.assertNotIn("Argon 品質レビュー所見", md_text)
+
+            state = json.loads((output_root / "2026-11-22" / "state.json").read_text(encoding="utf-8"))
+            entry = state["prompts"]["02-beta"]
+            self.assertEqual(entry["review_verdict"], "PASS")
+            self.assertEqual(entry["revision_count"], 1)
+
+            # max_revisions=0 disables the revision loop even on NEEDS_REVISION
+            research_calls.clear()
+            review_calls.clear()
+            rc_no_loop = rdr.run_daily(
+                prompts_dir=prompts_dir,
+                output_root=output_root,
+                dashboard_reports_dir=dash_root,
+                css_path=css_path,
+                run_date="2026-11-22",
+                only="02",
+                force=True,
+                max_revisions=0,
+                enable_community=False,
+                runner=fake_runner,
+                review_runner=fake_review_runner,
+            )
+            self.assertEqual(rc_no_loop, 0)
+            self.assertEqual(len(research_calls), 1)
+            self.assertEqual(len(review_calls), 1)
+            state_no_loop = json.loads((output_root / "2026-11-22" / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state_no_loop["prompts"]["02-beta"]["review_verdict"], "NEEDS_REVISION")
+            self.assertEqual(state_no_loop["prompts"]["02-beta"]["revision_count"], 0)
+
+    def test_revision_failure_preserves_previous_draft_and_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts_dir = root / "prompts"
+            prompts_dir.mkdir()
+            (prompts_dir / "02-beta.txt").write_text("# Beta\n調査して\n", encoding="utf-8")
+            output_root = root / "output"
+            dash_root = root / "dash"
+            css_path = DAILY_RESEARCH_DIR / "document.css"
+
+            def fake_runner(prompt_text: str, run_date: str, timeout_sec: int) -> str:
+                if "Argon レビュー指摘（要修正）" in prompt_text:
+                    raise RuntimeError("simulated revision failure")
+                return "# Beta 初稿\n\n## 要点サマリー (TL;DR)\n- 初稿保持\n"
+
+            def fake_review_runner(
+                spec: rdr.PromptSpec,
+                markdown_body: str,
+                run_date: str,
+                community_buzz_lines: rdr.Sequence[str],
+                review_model: str,
+                review_timeout_sec: int,
+            ) -> str:
+                return "## Argon 品質レビュー所見\n\n- **判定**: `NEEDS_REVISION`\n- 要修正\n"
+
+            rc = rdr.run_daily(
+                prompts_dir=prompts_dir,
+                output_root=output_root,
+                dashboard_reports_dir=dash_root,
+                css_path=css_path,
+                run_date="2026-11-22",
+                only="02",
+                max_revisions=1,
+                enable_community=False,
+                runner=fake_runner,
+                review_runner=fake_review_runner,
+            )
+            self.assertEqual(rc, 0)
+            md_text = (output_root / "2026-11-22" / "20261122-02-beta.md").read_text(encoding="utf-8")
+            self.assertIn("初稿保持", md_text)
+            self.assertNotIn("Argon 品質レビュー所見", md_text)
+            state = json.loads((output_root / "2026-11-22" / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state["prompts"]["02-beta"]["revision_count"], 0)
+            self.assertEqual(state["prompts"]["02-beta"]["review_verdict"], "NEEDS_REVISION")
 
 
 if __name__ == "__main__":
