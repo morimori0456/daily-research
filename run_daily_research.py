@@ -55,6 +55,7 @@ PROMPT_REVIEW_CHECKLIST: dict[str, str] = {
     "05": "Google/OpenAI/Anthropic FDE 動向・エンタープライズ本番導入・System Design の整合、L1 中心時の 0 件許容、年収・待遇の断定禁止",
     "06": "未解決ボトルネック台帳と `03`/`07` 転用仮説の紐付け、Jetson AGX Thor / NAVSIM 等での1週間最小反証実験プラン、P99 ≤ 100ms 制約の整合",
     "07": "Loop 1枠・Graph 1枠の最低予約枠の遵守（L2 不在時は空席＋次点 L1 1行で他柱埋め禁止）、`## 探索カバレッジ` 表（全8サブ領域）と主軸一意決定規則、用語ウォッチ枠の分離",
+    "08": "AI語学学習・SLA研究・実践事例の根拠（被験者・実験条件・一次出典の明記と誇大効果の排除）、L1項目での未確認コマンド/効果断定の禁止、明日の日常英会話学習（15〜30分）への具体的な落とし込みの有無",
 }
 
 HN_ALGOLIA_SEARCH_URL = "https://hn.algolia.com/api/v1/search"

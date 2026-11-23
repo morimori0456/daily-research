@@ -34,6 +34,7 @@ class PromptDiscoveryTests(unittest.TestCase):
                 "05-fde-career-and-enterprise-deployment",
                 "06-av-breakthrough-and-cross-domain-experiments",
                 "07-agent-control-loop-and-graph-engineering",
+                "08-english-speaking-and-ai-language-learning",
             ],
         )
         for p in prompts:
@@ -257,7 +258,7 @@ VLAモデルの車載最適化が進んでいます。World Modelの推論時制
 class PromptContentValidationTests(unittest.TestCase):
     def test_updated_prompts_format_and_constraints(self) -> None:
         prompts = rdr.discover_prompts(DAILY_RESEARCH_DIR / "prompts")
-        self.assertEqual(len(prompts), 7)
+        self.assertEqual(len(prompts), 8)
         by_id = {p.prompt_id: p for p in prompts}
 
         for p in prompts:
@@ -392,13 +393,23 @@ class PromptContentValidationTests(unittest.TestCase):
         ):
             self.assertIn(marker, by_id["07"].text)
 
-        for pid in ("01", "02", "03", "04", "05", "07"):
+        for pid in ("01", "02", "03", "04", "05", "07", "08"):
             self.assertIn("Reddit", by_id[pid].text, msg=f"{pid} missing Reddit")
             self.assertIn("コミュニティ探索メモ", by_id[pid].text, msg=f"{pid} missing コミュニティ探索メモ")
             self.assertIn("検索結果では未確認", by_id[pid].text, msg=f"{pid} missing 検索結果では未確認")
             self.assertIn("[C: コミュニティ議論", by_id[pid].text, msg=f"{pid} missing [C: コミュニティ議論")
         self.assertIn("評価監査（Evaluation Audit）の判定根拠にバズ指標", by_id["03"].text)
         self.assertIn("Loop 1枠・Graph 1枠の最低予約枠を絶対に消費させず", by_id["07"].text)
+        self.assertEqual(
+            by_id["08"].text.splitlines()[0],
+            "# AI英会話・最新語学学習法 日次調査レポート",
+        )
+        for marker in (
+            "SLA",
+            "## 今日の学習プロトコル更新案（外資・海外実務向け）",
+            "日常の英会話学習への組み込み方（15〜30分）",
+        ):
+            self.assertIn(marker, by_id["08"].text)
 
 
 class DeduplicationAndPromptWrapperTests(unittest.TestCase):
